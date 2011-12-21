@@ -86,7 +86,7 @@ namespace ICSharpCode.Decompiler
 		{
 			WriteIndent();
 			writer.Write(text);
-			column += text.Length;
+			if (text != null) column += text.Length;
 		}
 		
 		public void WriteLine()

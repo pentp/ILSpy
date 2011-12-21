@@ -46,11 +46,10 @@ namespace ICSharpCode.Decompiler.Ast
 		};
 		
 		
-		public static void AssignNamesToVariables(DecompilerContext context, IEnumerable<ILVariable> parameters, IEnumerable<ILVariable> variables, ILBlock methodBody)
+		public static void AssignNamesToVariables(DecompilerContext context, List<ILVariable> parameters, IEnumerable<ILVariable> variables, ILBlock methodBody)
 		{
 			NameVariables nv = new NameVariables();
 			nv.context = context;
-			nv.fieldNamesInCurrentType = context.CurrentType.Fields.Select(f => f.Name).ToList();
 			// First mark existing variable names as reserved.
 			foreach (string name in context.ReservedVariableNames)
 				nv.AddExistingName(name);
@@ -100,7 +99,7 @@ namespace ICSharpCode.Decompiler.Ast
 		}
 		
 		DecompilerContext context;
-		List<string> fieldNamesInCurrentType;
+		HashSet<string> fieldNamesInCurrentType;
 		Dictionary<string, int> typeNames = new Dictionary<string, int>();
 		
 		public void AddExistingName(string name)
@@ -197,29 +196,43 @@ namespace ICSharpCode.Decompiler.Ast
 					}
 				}
 			}
-			if (string.IsNullOrEmpty(proposedName)) {
-				var proposedNameForStores =
-					(from expr in methodBody.GetSelfAndChildrenRecursive<ILExpression>()
-					 where expr.Code == ILCode.Stloc && expr.Operand == variable
-					 select GetNameFromExpression(expr.Arguments.Single())
-					).Except(fieldNamesInCurrentType).ToList();
-				if (proposedNameForStores.Count == 1) {
-					proposedName = proposedNameForStores[0];
+			if (proposedName == null) {
+				if (fieldNamesInCurrentType == null) fieldNamesInCurrentType = new HashSet<string>(context.CurrentType.Fields.Select(f => f.Name));
+
+				var bodyExpressions = methodBody.GetSelfAndChildrenRecursive<ILExpression>();
+				foreach (var expr in bodyExpressions) {
+					if (expr.Code != ILCode.Stloc || expr.Operand != variable) continue;
+					var n = GetNameFromExpression(expr.Arguments.Single());
+					if (n == null) {
+						proposedName = null;
+						break;
+					}
+					if (fieldNamesInCurrentType.Contains(n)) continue;
+					if (proposedName != null && proposedName != n) {
+						proposedName = null;
+						break;
+					}
+					proposedName = n;
+				}
+
+				if (proposedName == null) {
+					foreach (var expr in bodyExpressions) {
+						for (int i = 0; i < expr.Arguments.Count; i++) {
+							var arg = expr.Arguments[i];
+							if (arg.Code != ILCode.Ldloc || arg.Operand != variable) continue;
+							var n = GetNameForArgument(expr, i);
+							if (n == null || fieldNamesInCurrentType.Contains(n)) continue;
+							if (proposedName != null && proposedName != n) {
+								proposedName = null;
+								goto inconclusive;
+							}
+							proposedName = n;
+						}
+					}
+					inconclusive: ;
 				}
 			}
-			if (string.IsNullOrEmpty(proposedName)) {
-				var proposedNameForLoads =
-					(from expr in methodBody.GetSelfAndChildrenRecursive<ILExpression>()
-					 from i in Enumerable.Range(0, expr.Arguments.Count)
-					 let arg = expr.Arguments[i]
-					 where arg.Code == ILCode.Ldloc && arg.Operand == variable
-					 select GetNameForArgument(expr, i)
-					).Except(fieldNamesInCurrentType).ToList();
-				if (proposedNameForLoads.Count == 1) {
-					proposedName = proposedNameForLoads[0];
-				}
-			}
-			if (string.IsNullOrEmpty(proposedName)) {
+			if (proposedName == null) {
 				proposedName = GetNameByType(variable.Type);
 			}
 			
@@ -288,6 +301,7 @@ namespace ICSharpCode.Decompiler.Ast
 					}
 					MethodDefinition methodDef = methodRef.Resolve();
 					if (methodDef != null) {
+						if (methodDef.IsSpecialName && methodDef.IsStatic && methodDef.Name.StartsWith("op_", StringComparison.Ordinal)) return null;
 						var p = methodDef.Parameters.ElementAtOrDefault((parent.Code != ILCode.Newobj && methodDef.HasThis) ? i - 1 : i);
 						if (p != null && !string.IsNullOrEmpty(p.Name))
 							return CleanUpVariableName(p.Name);

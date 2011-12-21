@@ -95,8 +95,11 @@ namespace ICSharpCode.Decompiler.Ast
 			bodyGraph.Optimize(context, ilMethod);
 			context.CancellationToken.ThrowIfCancellationRequested();
 			
-			var localVariables = ilMethod.GetSelfAndChildrenRecursive<ILExpression>().Select(e => e.Operand as ILVariable)
-				.Where(v => v != null && !v.IsParameter).Distinct();
+			var localVariables = ilMethod.GetSelfAndChildrenRecursive<ILExpression>(e =>
+			{
+				var v = e.Operand as ILVariable;
+				return v != null && !v.IsParameter;
+			}).Select(e => (ILVariable)e.Operand).Distinct();
 			Debug.Assert(context.CurrentMethod == methodDef);
 			NameVariables.AssignNamesToVariables(context, astBuilder.Parameters, localVariables, ilMethod);
 			

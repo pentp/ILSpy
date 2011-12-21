@@ -401,11 +401,11 @@ public class InitializerTests
 
 	public static void NotACollectionInitializer()
 	{
-		List<int> list = new List<int>();
-		list.Add(1);
-		list.Add(2);
-		list.Add(3);
-		InitializerTests.X(InitializerTests.Y(), list);
+		List<int> b = new List<int>();
+		b.Add(1);
+		b.Add(2);
+		b.Add(3);
+		InitializerTests.X(InitializerTests.Y(), b);
 	}
 
 	public static void ObjectInitializer()
@@ -418,9 +418,9 @@ public class InitializerTests
 
 	public static void NotAObjectInitializer()
 	{
-		InitializerTests.Data data = new InitializerTests.Data();
-		data.a = InitializerTests.MyEnum.a;
-		InitializerTests.X(InitializerTests.Y(), data);
+		InitializerTests.Data b = new InitializerTests.Data();
+		b.a = InitializerTests.MyEnum.a;
+		InitializerTests.X(InitializerTests.Y(), b);
 	}
 
 	public static void ObjectInitializerAssignCollectionToField()

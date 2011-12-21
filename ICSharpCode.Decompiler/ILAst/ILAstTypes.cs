@@ -102,7 +102,7 @@ namespace ICSharpCode.Decompiler.ILAst
 		}
 	}
 	
-	public class ILBasicBlock: ILNode
+	public sealed class ILBasicBlock: ILNode
 	{
 		/// <remarks> Body has to start with a label and end with unconditional control flow </remarks>
 		public List<ILNode> Body = new List<ILNode>();
@@ -121,7 +121,7 @@ namespace ICSharpCode.Decompiler.ILAst
 		}
 	}
 	
-	public class ILLabel: ILNode
+	public sealed class ILLabel: ILNode
 	{
 		public string Name;
 
@@ -131,9 +131,9 @@ namespace ICSharpCode.Decompiler.ILAst
 		}
 	}
 	
-	public class ILTryCatchBlock: ILNode
+	public sealed class ILTryCatchBlock: ILNode
 	{
-		public class CatchBlock: ILBlock
+		public sealed class CatchBlock: ILBlock
 		{
 			public TypeReference ExceptionType;
 			public ILVariable ExceptionVariable;
@@ -199,7 +199,7 @@ namespace ICSharpCode.Decompiler.ILAst
 		}
 	}
 	
-	public class ILVariable
+	public sealed class ILVariable
 	{
 		public string Name;
 		public bool   IsGenerated;
@@ -221,7 +221,7 @@ namespace ICSharpCode.Decompiler.ILAst
 		}
 	}
 	
-	public class ILRange
+	public sealed class ILRange
 	{
 		public int From;
 		public int To;   // Exlusive
@@ -279,7 +279,7 @@ namespace ICSharpCode.Decompiler.ILAst
 		}
 	}
 	
-	public class ILExpressionPrefix
+	public sealed class ILExpressionPrefix
 	{
 		public readonly ILCode Code;
 		public readonly object Operand;
@@ -291,7 +291,7 @@ namespace ICSharpCode.Decompiler.ILAst
 		}
 	}
 	
-	public class ILExpression : ILNode
+	public sealed class ILExpression : ILNode
 	{
 		public ILCode Code { get; set; }
 		public object Operand { get; set; }
@@ -453,7 +453,7 @@ namespace ICSharpCode.Decompiler.ILAst
 		}
 	}
 	
-	public class ILWhileLoop : ILNode
+	public sealed class ILWhileLoop : ILNode
 	{
 		public ILExpression Condition;
 		public ILBlock      BodyBlock;
@@ -480,7 +480,7 @@ namespace ICSharpCode.Decompiler.ILAst
 		}
 	}
 	
-	public class ILCondition : ILNode
+	public sealed class ILCondition : ILNode
 	{
 		public ILExpression Condition;
 		public ILBlock TrueBlock;   // Branch was taken
@@ -515,9 +515,9 @@ namespace ICSharpCode.Decompiler.ILAst
 		}
 	}
 	
-	public class ILSwitch: ILNode
+	public sealed class ILSwitch: ILNode
 	{
-		public class CaseBlock: ILBlock
+		public sealed class CaseBlock: ILBlock
 		{
 			public List<int> Values;  // null for the default case
 			
@@ -562,7 +562,7 @@ namespace ICSharpCode.Decompiler.ILAst
 		}
 	}
 	
-	public class ILFixedStatement : ILNode
+	public sealed class ILFixedStatement : ILNode
 	{
 		public List<ILExpression> Initializers = new List<ILExpression>();
 		public ILBlock      BodyBlock;
