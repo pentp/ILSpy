@@ -468,8 +468,8 @@ namespace ICSharpCode.Decompiler.ILAst
 						}
 						
 						// perform copy propagation:
-						foreach (var expr in method.GetSelfAndChildrenRecursive<ILExpression>()) {
-							if (expr.Code == ILCode.Ldloc && expr.Operand == v) {
+						foreach (var expr in method.GetSelfAndChildrenRecursive<ILExpression>(e => e.Code == ILCode.Ldloc)) {
+							if (expr.Operand == v) {
 								expr.Code = copiedExpr.Code;
 								expr.Operand = copiedExpr.Operand;
 								for (int j = 0; j < uninlinedArgs.Length; j++) {

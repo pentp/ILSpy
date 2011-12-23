@@ -295,7 +295,7 @@ namespace ICSharpCode.Decompiler.ILAst
 			
 			// Ignore arguments of 'leave'
 			foreach (ILExpression expr in method.GetSelfAndChildrenRecursive<ILExpression>(e => e.Code == ILCode.Leave)) {
-				if (expr.Arguments.Any(arg => !arg.Match(ILCode.Ldloc)))
+				if (expr.Arguments.Exists(arg => !arg.Match(ILCode.Ldloc)))
 					throw new Exception("Leave should have just ldloc at this stage");
 				expr.Arguments.Clear();
 			}
@@ -573,7 +573,7 @@ namespace ICSharpCode.Decompiler.ILAst
 		void RemoveEndFinally(ILBlock method)
 		{
 			// Go thought the list in reverse so that we do the nested blocks first
-			foreach(var tryCatch in method.GetSelfAndChildrenRecursive<ILTryCatchBlock>(tc => tc.FinallyBlock != null).Reverse()) {
+			foreach(var tryCatch in method.GetSelfAndChildrenRecursive<ILTryCatchBlock>(tc => tc.FinallyBlock != null).AsEnumerable().Reverse()) {
 				ILLabel label = new ILLabel() { Name = "EndFinally_" + nextLabelIndex++ };
 				tryCatch.FinallyBlock.Body.Add(label);
 				foreach(var block in tryCatch.FinallyBlock.GetSelfAndChildrenRecursive<ILBlock>()) {

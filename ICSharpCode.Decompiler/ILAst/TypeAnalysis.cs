@@ -151,7 +151,7 @@ namespace ICSharpCode.Decompiler.ILAst
 				group expr by v;
 			foreach (var g in q.ToArray()) {
 				ILVariable v = g.Key;
-				if (g.Count() == 1 && g.Single().Expression.GetSelfAndChildrenRecursive<ILExpression>().Count(e => e.Operand == v) == 1) {
+				if (g.Count() == 1 && g.Single().Expression.GetSelfAndChildrenRecursive<ILExpression>(e => e.Operand == v).Count == 1) {
 					singleLoadVariables.Add(v);
 					// Mark the assignments as dependent on the type from the single load:
 					foreach (var assignment in assignmentExpressions[v]) {
@@ -197,7 +197,7 @@ namespace ICSharpCode.Decompiler.ILAst
 				// Now infer types for variables:
 				foreach (var pair in assignmentExpressions) {
 					ILVariable v = pair.Key;
-					if (v.Type == null && (assignVariableTypesBasedOnPartialInformation ? pair.Value.Any(e => e.Done) : pair.Value.All(e => e.Done))) {
+					if (v.Type == null && (assignVariableTypesBasedOnPartialInformation ? pair.Value.Exists(e => e.Done) : pair.Value.TrueForAll(e => e.Done))) {
 						TypeReference inferredType = null;
 						foreach (ExpressionToInfer expr in pair.Value) {
 							Debug.Assert(expr.Expression.Code == ILCode.Stloc);
@@ -227,7 +227,7 @@ namespace ICSharpCode.Decompiler.ILAst
 		
 		void RunInference(ILExpression expr)
 		{
-			bool anyArgumentIsMissingExpectedType = expr.Arguments.Any(a => a.ExpectedType == null);
+			bool anyArgumentIsMissingExpectedType = expr.Arguments.Exists(a => a.ExpectedType == null);
 			if (expr.InferredType == null || anyArgumentIsMissingExpectedType)
 				InferTypeForExpression(expr, expr.ExpectedType, forceInferChildren: anyArgumentIsMissingExpectedType);
 			foreach (var arg in expr.Arguments) {

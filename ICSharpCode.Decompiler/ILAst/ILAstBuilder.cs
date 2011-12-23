@@ -440,10 +440,10 @@ namespace ICSharpCode.Decompiler.ILAst
 				if (byteCode.StoreTo != null && byteCode.StoreTo.Count > 1) {
 					var locVars = byteCode.StoreTo;
 					// For each of the variables, find the location where it is loaded - there should be preciesly one
-					var loadedBy = locVars.Select(locVar => body.SelectMany(bc => bc.StackBefore).Single(s => s.LoadFrom == locVar)).ToList();
+					var loadedBy = locVars.ConvertAll(locVar => body.SelectMany(bc => bc.StackBefore).Single(s => s.LoadFrom == locVar));
 					// We now know that all the variables have a single load,
 					// Let's make sure that they have also a single store - us
-					if (loadedBy.All(slot => slot.Definitions.Length == 1 && slot.Definitions[0] == byteCode)) {
+					if (loadedBy.TrueForAll(slot => slot.Definitions.Length == 1 && slot.Definitions[0] == byteCode)) {
 						// Great - we can reduce everything into single variable
 						ILVariable tmpVar = new ILVariable() { Name = string.Format("expr_{0:X2}", byteCode.Offset), IsGenerated = true };
 						byteCode.StoreTo = new List<ILVariable>() { tmpVar };
@@ -528,15 +528,15 @@ namespace ICSharpCode.Decompiler.ILAst
 			foreach(VariableDefinition varDef in methodDef.Body.Variables) {
 				
 				// Find all definitions and uses of this variable
-				var defs = body.Where(b => b.Operand == varDef &&  b.IsVariableDefinition).ToList();
-				var uses = body.Where(b => b.Operand == varDef && !b.IsVariableDefinition).ToList();
+				var defs = body.FindAll(b => b.Operand == varDef &&  b.IsVariableDefinition);
+				var uses = body.FindAll(b => b.Operand == varDef && !b.IsVariableDefinition);
 				
 				List<VariableInfo> newVars;
 				
 				// If the variable is pinned, use single variable.
 				// If any of the uses is from unknown definition, use single variable
 				// If any of the uses is ldloca with a nondeterministic usage pattern, use  single variable
-				if (!optimize || varDef.IsPinned || uses.Any(b => b.VariablesBefore[varDef.Index].UnknownDefinition || (b.Code == ILCode.Ldloca && !IsDeterministicLdloca(b)))) {				
+				if (!optimize || varDef.IsPinned || uses.Exists(b => b.VariablesBefore[varDef.Index].UnknownDefinition || (b.Code == ILCode.Ldloca && !IsDeterministicLdloca(b)))) {
 					newVars = new List<VariableInfo>(1) { new VariableInfo() {
 						Variable = new ILVariable() {
 							Name = string.IsNullOrEmpty(varDef.Name) ? "var_" + varDef.Index : varDef.Name,
@@ -548,7 +548,7 @@ namespace ICSharpCode.Decompiler.ILAst
 					}};
 				} else {
 					// Create a new variable for each definition
-					newVars = defs.Select(def => new VariableInfo() {
+					newVars = defs.ConvertAll(def => new VariableInfo() {
 						Variable = new ILVariable() {
 							Name = (string.IsNullOrEmpty(varDef.Name) ? "var_" + varDef.Index : varDef.Name) + "_" + def.Offset.ToString("X2"),
 							Type = varDef.VariableType,
@@ -556,7 +556,7 @@ namespace ICSharpCode.Decompiler.ILAst
 					    },
 					    Defs = new List<ByteCode>() { def },
 					    Uses  = new List<ByteCode>()
-					}).ToList();
+					});
 					
 					// VB.NET uses the 'init' to allow use of uninitialized variables.
 					// We do not really care about them too much - if the original variable
@@ -574,7 +574,7 @@ namespace ICSharpCode.Decompiler.ILAst
 							VariableInfo newVar = newVars.Single(v => v.Defs.Contains(useDefs[0]));
 							newVar.Uses.Add(use);
 						} else {
-							List<VariableInfo> mergeVars = newVars.Where(v => v.Defs.Intersect(useDefs).Any()).ToList();
+							var mergeVars = newVars.FindAll(v => v.Defs.Intersect(useDefs).Any());
 							VariableInfo mergedVar = new VariableInfo() {
 								Variable = mergeVars[0].Variable,
 								Defs = mergeVars.SelectMany(v => v.Defs).ToList(),

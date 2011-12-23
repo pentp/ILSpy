@@ -185,8 +185,8 @@ namespace ICSharpCode.Decompiler.ILAst
 				return;
 			
 			ILNode followingNode = block.Body.ElementAtOrDefault(i + 1);
-			if (followingNode != null && followingNode.GetSelfAndChildrenRecursive<ILExpression>().Count(
-				e => e.Code == ILCode.Ldsfld && ((FieldReference)e.Operand).ResolveWithinSameModule() == field) == 1)
+			if (followingNode != null && followingNode.GetSelfAndChildrenRecursive<ILExpression>(
+				e => e.Code == ILCode.Ldsfld && ((FieldReference)e.Operand).ResolveWithinSameModule() == field).Count == 1)
 			{
 				foreach (ILExpression parent in followingNode.GetSelfAndChildrenRecursive<ILExpression>()) {
 					for (int j = 0; j < parent.Arguments.Count; j++) {
@@ -221,7 +221,7 @@ namespace ICSharpCode.Decompiler.ILAst
 				return;
 			ILVariable v = (ILVariable)condition.Operand;
 			ILExpression stloc = c.TrueBlock.Body[0] as ILExpression;
-			if (!(stloc != null && stloc.Code == ILCode.Stloc && (ILVariable)stloc.Operand == v))
+			if (!(stloc != null && stloc.Code == ILCode.Stloc && stloc.Operand == v))
 				return;
 			ILExpression newObj = stloc.Arguments[0];
 			if (!(newObj.Code == ILCode.Newobj && newObj.Arguments.Count == 2))
@@ -235,8 +235,7 @@ namespace ICSharpCode.Decompiler.ILAst
 				return;
 			
 			ILNode followingNode = block.Body.ElementAtOrDefault(i + 1);
-			if (followingNode != null && followingNode.GetSelfAndChildrenRecursive<ILExpression>().Count(
-				e => e.Code == ILCode.Ldloc && (ILVariable)e.Operand == v) == 1)
+			if (followingNode != null && followingNode.GetSelfAndChildrenRecursive<ILExpression>(e => e.Code == ILCode.Ldloc && e.Operand == v).Count == 1)
 			{
 				ILInlining inlining = new ILInlining(method);
 				if (!(inlining.numLdloc.GetOrDefault(v) == 2 && inlining.numStloc.GetOrDefault(v) == 2 && inlining.numLdloca.GetOrDefault(v) == 0))

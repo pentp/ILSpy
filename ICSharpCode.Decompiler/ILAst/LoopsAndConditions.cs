@@ -286,7 +286,7 @@ namespace ICSharpCode.Decompiler.ILAst
 								ILLabel condLabel = caseLabels[i];
 								
 								// Find or create new case block
-								ILSwitch.CaseBlock caseBlock = ilSwitch.CaseBlocks.FirstOrDefault(b => b.EntryGoto.Operand == condLabel);
+								var caseBlock = ilSwitch.CaseBlocks.Find(b => b.EntryGoto.Operand == condLabel);
 								if (caseBlock == null) {
 									caseBlock = new ILSwitch.CaseBlock() {
 										Values = new List<int>(),

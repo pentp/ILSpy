@@ -897,9 +897,8 @@ namespace ICSharpCode.Decompiler.ILAst
 					block.Body.RemoveAt(0);
 			}
 			// Convert ret to endfinally
-			foreach (ILExpression expr in block.GetSelfAndChildrenRecursive<ILExpression>()) {
-				if (expr.Code == ILCode.Ret)
-					expr.Code = ILCode.Endfinally;
+			foreach (var expr in block.GetSelfAndChildrenRecursive<ILExpression>(e => e.Code == ILCode.Ret)) {
+				expr.Code = ILCode.Endfinally;
 			}
 			return block;
 		}

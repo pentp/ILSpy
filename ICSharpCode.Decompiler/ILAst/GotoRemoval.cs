@@ -64,7 +64,7 @@ namespace ICSharpCode.Decompiler.ILAst
 			// Remove dead lables and nops
 			HashSet<ILLabel> liveLabels = new HashSet<ILLabel>(method.GetSelfAndChildrenRecursive<ILExpression>(e => e.IsBranch()).SelectMany(e => e.GetBranchTargets()));
 			foreach(ILBlock block in method.GetSelfAndChildrenRecursive<ILBlock>()) {
-				block.Body = block.Body.Where(n => !n.Match(ILCode.Nop) && !(n is ILLabel && !liveLabels.Contains((ILLabel)n))).ToList();
+				block.Body = block.Body.FindAll(n => !n.Match(ILCode.Nop) && !(n is ILLabel && !liveLabels.Contains((ILLabel)n)));
 			}
 			
 			// Remove redundant continue
