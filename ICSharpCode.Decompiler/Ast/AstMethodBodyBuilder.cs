@@ -170,11 +170,10 @@ namespace ICSharpCode.Decompiler.Ast
 				yield return whileStmt;
 			} else if (node is ILCondition) {
 				ILCondition conditionalNode = (ILCondition)node;
-				bool hasFalseBlock = conditionalNode.FalseBlock.EntryGoto != null || conditionalNode.FalseBlock.Body.Count > 0;
 				yield return new Ast.IfElseStatement {
 					Condition = (Expression)TransformExpression(conditionalNode.Condition),
 					TrueStatement = TransformBlock(conditionalNode.TrueBlock),
-					FalseStatement = hasFalseBlock ? TransformBlock(conditionalNode.FalseBlock) : null
+					FalseStatement = conditionalNode.FalseBlock.IsEmpty ? null : TransformBlock(conditionalNode.FalseBlock) 
 				};
 			} else if (node is ILSwitch) {
 				ILSwitch ilSwitch = (ILSwitch)node;

@@ -190,8 +190,8 @@ namespace ICSharpCode.Decompiler.ILAst
 					
 					// Fallback method: while(true)
 					if (scope.Contains(node)) {
-						result.Add(new ILBasicBlock() {
-							Body = new List<ILNode>() {
+						result.Add(new ILBasicBlock(
+							new List<ILNode>() {
 								new ILLabel() { Name = "Loop_" + (nextLabelIndex++) },
 								new ILWhileLoop() {
 									BodyBlock = new ILBlock() {
@@ -199,8 +199,8 @@ namespace ICSharpCode.Decompiler.ILAst
 										Body = FindLoops(loopContents, node, true)
 									}
 								},
-							},
-						});
+							}
+						));
 						
 						scope.ExceptWith(loopContents);
 					}
@@ -301,12 +301,12 @@ namespace ICSharpCode.Decompiler.ILAst
 										scope.ExceptWith(content);
 										caseBlock.Body.AddRange(FindConditions(content, condTarget));
 										// Add explicit break which should not be used by default, but the goto removal might decide to use it
-										caseBlock.Body.Add(new ILBasicBlock() {
-											Body = {
+										caseBlock.Body.Add(new ILBasicBlock(
+											new List<ILNode>() {
 												new ILLabel() { Name = "SwitchBreak_" + (nextLabelIndex++) },
 												new ILExpression(ILCode.LoopOrSwitchBreak, null)
 											}
-										});
+										));
 									}
 								}
 								caseBlock.Values.Add(i + addValue);
@@ -323,12 +323,12 @@ namespace ICSharpCode.Decompiler.ILAst
 									scope.ExceptWith(content);
 									caseBlock.Body.AddRange(FindConditions(content, fallTarget));
 									// Add explicit break which should not be used by default, but the goto removal might decide to use it
-									caseBlock.Body.Add(new ILBasicBlock() {
-										Body = {
+									caseBlock.Body.Add(new ILBasicBlock(
+										new List<ILNode>() {
 											new ILLabel() { Name = "SwitchBreak_" + (nextLabelIndex++) },
 											new ILExpression(ILCode.LoopOrSwitchBreak, null)
 										}
-									});
+									));
 								}
 							}
 						}

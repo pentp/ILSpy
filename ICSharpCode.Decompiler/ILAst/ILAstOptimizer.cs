@@ -597,21 +597,18 @@ namespace ICSharpCode.Decompiler.ILAst
 				for (int i = 0; i < block.Body.Count; i++) {
 					ILCondition cond = block.Body[i] as ILCondition;
 					if (cond != null) {
-						bool trueExits = cond.TrueBlock.Body.LastOrDefault().IsUnconditionalControlFlow();
-						bool falseExits = cond.FalseBlock.Body.LastOrDefault().IsUnconditionalControlFlow();
-						
-						if (trueExits) {
+						if (cond.TrueBlock.Body.LastOrDefault().IsUnconditionalControlFlow()) {
 							// Move the false block after the condition
 							block.Body.InsertRange(i + 1, cond.FalseBlock.GetChildren());
 							cond.FalseBlock = new ILBlock();
-						} else if (falseExits) {
+						} else if (cond.FalseBlock.Body.LastOrDefault().IsUnconditionalControlFlow()) {
 							// Move the true block after the condition
 							block.Body.InsertRange(i + 1, cond.TrueBlock.GetChildren());
 							cond.TrueBlock = new ILBlock();
 						}
 						
 						// Eliminate empty true block
-						if (!cond.TrueBlock.GetChildren().Any() && cond.FalseBlock.GetChildren().Any()) {
+						if (cond.TrueBlock.IsEmpty && !cond.FalseBlock.IsEmpty) {
 							// Swap bodies
 							ILBlock tmp = cond.TrueBlock;
 							cond.TrueBlock = cond.FalseBlock;

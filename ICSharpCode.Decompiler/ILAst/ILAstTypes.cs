@@ -36,26 +36,111 @@ namespace ICSharpCode.Decompiler.ILAst
 	{
 		public List<T> GetSelfAndChildrenRecursive<T>(Func<T, bool> predicate = null) where T: ILNode
 		{
-			List<T> result = new List<T>(16);
-			AccumulateSelfAndChildrenRecursive(result, predicate);
-			return result;
+			Accumulator<T> a;
+			if (typeof(T) == typeof(ILExpression)) {
+				a = (Accumulator<T>)(object)new ILExpressionAccumulator();
+				a.result = new List<T>();
+			} else if (typeof(T) == typeof(ILBasicBlock)) {
+				a = new Accumulator<T>();
+				a.result = new List<T>(16);
+			} else if (typeof(T) == typeof(ILNode)) {
+				a = (Accumulator<T>)(object)new ILNodeAccumulator();
+				a.result = new List<T>(32);
+			} else {
+				a = new Accumulator<T>();
+				a.result = new List<T>();
+			}
+			a.predicate = predicate;
+			a.Add(this);
+			return a.result;
 		}
-		
-		void AccumulateSelfAndChildrenRecursive<T>(List<T> list, Func<T, bool> predicate) where T:ILNode
+
+		protected class Accumulator<T> where T : ILNode
 		{
-			// Note: RemoveEndFinally depends on self coming before children
-			T thisAsT = this as T;
-			if (thisAsT != null && (predicate == null || predicate(thisAsT)))
-				list.Add(thisAsT);
-			foreach (ILNode node in this.GetChildren()) {
-				if (node != null)
-					node.AccumulateSelfAndChildrenRecursive(list, predicate);
+			public List<T> result;
+			public Func<T, bool> predicate;
+
+			public virtual void Add(ILNode node)
+			{
+				var nodeAsT = node as T;
+				if (nodeAsT != null && (predicate == null || predicate(nodeAsT)))
+					result.Add(nodeAsT);
+				node.AccumulateChildren(this);
+			}
+
+			public virtual void Add(ILExpression expr) { }
+
+			public void Add<L>(List<L> nodes) where L : ILNode
+			{
+				if (nodes.Count != 0)
+					foreach (ILNode n in nodes) Add(n);
+			}
+
+			public virtual void Add(List<ILExpression> nodes) { }
+		}
+
+		sealed class ILExpressionAccumulator : Accumulator<ILExpression>
+		{
+			public override void Add(ILNode node)
+			{
+				var expr = node as ILExpression;
+				if (expr != null) this.Add(expr);
+				else node.AccumulateChildren(this);
+			}
+
+			public override void Add(ILExpression expr)
+			{
+				if (predicate == null || predicate(expr)) result.Add(expr);
+				this.Add(expr.Arguments);
+			}
+
+			public override void Add(List<ILExpression> nodes)
+			{
+				if (nodes.Count != 0)
+					foreach (var a in nodes) this.Add(a);
 			}
 		}
+
+		class ILNodeAccumulator : Accumulator<ILNode>
+		{
+			public override void Add(ILNode node)
+			{
+				if (predicate == null || predicate(node)) result.Add(node);
+				node.AccumulateChildren(this);
+			}
+
+			public override void Add(ILExpression expr)
+			{
+				this.Add(expr as ILNode);
+			}
+
+			public override void Add(List<ILExpression> nodes)
+			{
+				base.Add<ILExpression>(nodes);
+			}
+		}
+
+		sealed class ChildAccumulator : ILNodeAccumulator
+		{
+			public override void Add(ILNode node)
+			{
+				result.Add(node);
+			}
+
+			public override void Add(ILExpression expr)
+			{
+				result.Add(expr);
+			}
+		}
+
+		protected virtual void AccumulateChildren<T>(Accumulator<T> a) where T : ILNode { }
 		
 		public virtual IEnumerable<ILNode> GetChildren()
 		{
-			yield break;
+			var a = new ChildAccumulator();
+			a.result = new List<ILNode>();
+			this.AccumulateChildren(a);
+			return a.result;
 		}
 		
 		public override string ToString()
@@ -74,9 +159,9 @@ namespace ICSharpCode.Decompiler.ILAst
 		
 		public List<ILNode> Body;
 		
-		public ILBlock(params ILNode[] body)
+		public ILBlock()
 		{
-			this.Body = new List<ILNode>(body);
+			this.Body = new List<ILNode>();
 		}
 		
 		public ILBlock(List<ILNode> body)
@@ -84,12 +169,22 @@ namespace ICSharpCode.Decompiler.ILAst
 			this.Body = body;
 		}
 		
-		public override IEnumerable<ILNode> GetChildren()
+		protected sealed override void AccumulateChildren<T>(Accumulator<T> a)
 		{
-			if (this.EntryGoto != null)
-				yield return this.EntryGoto;
-			foreach(ILNode child in this.Body) {
-				yield return child;
+			if (EntryGoto != null) a.Add(EntryGoto);
+			a.Add(Body);
+		}
+
+		public sealed override IEnumerable<ILNode> GetChildren()
+		{
+			return EntryGoto == null ? Body : base.GetChildren();
+		}
+
+		public bool IsEmpty
+		{
+			get
+			{
+				return EntryGoto == null && Body.Count == 0;
 			}
 		}
 		
@@ -105,7 +200,22 @@ namespace ICSharpCode.Decompiler.ILAst
 	public sealed class ILBasicBlock: ILNode
 	{
 		/// <remarks> Body has to start with a label and end with unconditional control flow </remarks>
-		public List<ILNode> Body = new List<ILNode>();
+		public List<ILNode> Body;
+
+		public ILBasicBlock()
+		{
+			this.Body = new List<ILNode>();
+		}
+
+		public ILBasicBlock(List<ILNode> body)
+		{
+			this.Body = body;
+		}
+
+		protected override void AccumulateChildren<T>(Accumulator<T> a)
+		{
+			a.Add(this.Body);
+		}
 		
 		public override IEnumerable<ILNode> GetChildren()
 		{
@@ -114,7 +224,7 @@ namespace ICSharpCode.Decompiler.ILAst
 		
 		public override void WriteTo(ITextOutput output)
 		{
-			foreach(ILNode child in this.GetChildren()) {
+			foreach(var child in this.Body) {
 				child.WriteTo(output);
 				output.WriteLine();
 			}
@@ -124,6 +234,11 @@ namespace ICSharpCode.Decompiler.ILAst
 	public sealed class ILLabel: ILNode
 	{
 		public string Name;
+
+		public override IEnumerable<ILNode> GetChildren()
+		{
+			return Enumerable.Empty<ILNode>();
+		}
 
 		public override void WriteTo(ITextOutput output)
 		{
@@ -159,17 +274,12 @@ namespace ICSharpCode.Decompiler.ILAst
 		public ILBlock          FinallyBlock;
 		public ILBlock          FaultBlock;
 		
-		public override IEnumerable<ILNode> GetChildren()
+		protected override void AccumulateChildren<T>(Accumulator<T> a)
 		{
-			if (this.TryBlock != null)
-				yield return this.TryBlock;
-			foreach (var catchBlock in this.CatchBlocks) {
-				yield return catchBlock;
-			}
-			if (this.FaultBlock != null)
-				yield return this.FaultBlock;
-			if (this.FinallyBlock != null)
-				yield return this.FinallyBlock;
+			if (this.TryBlock != null) a.Add(this.TryBlock);
+			a.Add(this.CatchBlocks);
+			if (this.FaultBlock != null) a.Add(this.FaultBlock);
+			if (this.FinallyBlock != null) a.Add(this.FinallyBlock);
 		}
 		
 		public override void WriteTo(ITextOutput output)
@@ -349,6 +459,11 @@ namespace ICSharpCode.Decompiler.ILAst
 			}
 			return null;
 		}
+
+		protected override void AccumulateChildren<T>(Accumulator<T> a)
+		{
+			a.Add(Arguments);
+		}
 		
 		public override IEnumerable<ILNode> GetChildren()
 		{
@@ -367,7 +482,7 @@ namespace ICSharpCode.Decompiler.ILAst
 			} else if (this.Operand is ILLabel[]) {
 				return (ILLabel[])this.Operand;
 			} else {
-				return new ILLabel[] { };
+				return Enumerable.Empty<ILLabel>();
 			}
 		}
 		
@@ -458,12 +573,10 @@ namespace ICSharpCode.Decompiler.ILAst
 		public ILExpression Condition;
 		public ILBlock      BodyBlock;
 		
-		public override IEnumerable<ILNode> GetChildren()
+		protected override void AccumulateChildren<T>(Accumulator<T> a)
 		{
-			if (this.Condition != null)
-				yield return this.Condition;
-			if (this.BodyBlock != null)
-				yield return this.BodyBlock;
+			if (this.Condition != null) a.Add(this.Condition);
+			if (this.BodyBlock != null) a.Add(this.BodyBlock);
 		}
 		
 		public override void WriteTo(ITextOutput output)
@@ -486,14 +599,11 @@ namespace ICSharpCode.Decompiler.ILAst
 		public ILBlock TrueBlock;   // Branch was taken
 		public ILBlock FalseBlock;  // Fall-though
 		
-		public override IEnumerable<ILNode> GetChildren()
+		protected override void AccumulateChildren<T>(Accumulator<T> a)
 		{
-			if (this.Condition != null)
-				yield return this.Condition;
-			if (this.TrueBlock != null)
-				yield return this.TrueBlock;
-			if (this.FalseBlock != null)
-				yield return this.FalseBlock;
+			if (this.Condition != null) a.Add(this.Condition);
+			if (this.TrueBlock != null) a.Add(this.TrueBlock);
+			if (this.FalseBlock != null) a.Add(this.FalseBlock);
 		}
 		
 		public override void WriteTo(ITextOutput output)
@@ -539,13 +649,10 @@ namespace ICSharpCode.Decompiler.ILAst
 		public ILExpression Condition;
 		public List<CaseBlock> CaseBlocks = new List<CaseBlock>();
 		
-		public override IEnumerable<ILNode> GetChildren()
+		protected override void AccumulateChildren<T>(Accumulator<T> a)
 		{
-			if (this.Condition != null)
-				yield return this.Condition;
-			foreach (ILBlock caseBlock in this.CaseBlocks) {
-				yield return caseBlock;
-			}
+			if (this.Condition != null) a.Add(this.Condition);
+			a.Add(this.CaseBlocks);
 		}
 		
 		public override void WriteTo(ITextOutput output)
@@ -567,12 +674,10 @@ namespace ICSharpCode.Decompiler.ILAst
 		public List<ILExpression> Initializers = new List<ILExpression>();
 		public ILBlock      BodyBlock;
 		
-		public override IEnumerable<ILNode> GetChildren()
+		protected override void AccumulateChildren<T>(Accumulator<T> a)
 		{
-			foreach (ILExpression initializer in this.Initializers)
-				yield return initializer;
-			if (this.BodyBlock != null)
-				yield return this.BodyBlock;
+			a.Add(this.Initializers);
+			if (this.BodyBlock != null) a.Add(this.BodyBlock);
 		}
 		
 		public override void WriteTo(ITextOutput output)
