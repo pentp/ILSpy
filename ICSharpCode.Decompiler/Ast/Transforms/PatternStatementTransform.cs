@@ -302,7 +302,7 @@ namespace ICSharpCode.Decompiler.Ast.Transforms
 		/// <summary>
 		/// Gets whether there is an assignment to 'variableName' anywhere within the given node.
 		/// </summary>
-		bool HasAssignment(AstNode root, string variableName)
+		static bool HasAssignment(AstNode root, string variableName)
 		{
 			foreach (AstNode node in root.DescendantsAndSelf) {
 				IdentifierExpression ident = node as IdentifierExpression;
@@ -407,13 +407,13 @@ namespace ICSharpCode.Decompiler.Ast.Transforms
 		#endregion
 		
 		#region foreach (non-generic)
-		ExpressionStatement getEnumeratorPattern = new ExpressionStatement(
+		static readonly ExpressionStatement getEnumeratorPattern = new ExpressionStatement(
 			new AssignmentExpression(
 				new NamedNode("left", new IdentifierExpression(Pattern.AnyString)),
 				new AnyNode("collection").ToExpression().Invoke("GetEnumerator")
 			));
 		
-		TryCatchStatement nonGenericForeachPattern = new TryCatchStatement {
+		static readonly TryCatchStatement nonGenericForeachPattern = new TryCatchStatement {
 			TryBlock = new BlockStatement {
 				new WhileStatement {
 					Condition = new IdentifierExpression(Pattern.AnyString).WithName("enumerator").Invoke("MoveNext"),
@@ -540,7 +540,7 @@ namespace ICSharpCode.Decompiler.Ast.Transforms
 				}
 			}};
 		
-		public ForStatement TransformFor(ExpressionStatement node)
+		static ForStatement TransformFor(ExpressionStatement node)
 		{
 			Match m1 = variableAssignPattern.Match(node);
 			if (!m1.Success) return null;
@@ -578,7 +578,7 @@ namespace ICSharpCode.Decompiler.Ast.Transforms
 				}
 			}};
 		
-		public DoWhileStatement TransformDoWhile(WhileStatement whileLoop)
+		static DoWhileStatement TransformDoWhile(WhileStatement whileLoop)
 		{
 			Match m = doWhilePattern.Match(whileLoop);
 			if (m.Success) {
@@ -638,7 +638,7 @@ namespace ICSharpCode.Decompiler.Ast.Transforms
 				}
 			}};
 		
-		public LockStatement TransformLock(ExpressionStatement node)
+		static LockStatement TransformLock(ExpressionStatement node)
 		{
 			Match m1 = lockFlagInitPattern.Match(node);
 			if (!m1.Success) return null;
@@ -743,7 +743,7 @@ namespace ICSharpCode.Decompiler.Ast.Transforms
 			FalseStatement = new OptionalNode("nullStmt", new BlockStatement { Statements = { new Repeat(new AnyNode()) } })
 		};
 		
-		public SwitchStatement TransformSwitchOnString(IfElseStatement node)
+		static SwitchStatement TransformSwitchOnString(IfElseStatement node)
 		{
 			Match m = switchOnStringPattern.Match(node);
 			if (!m.Success)
@@ -802,7 +802,7 @@ namespace ICSharpCode.Decompiler.Ast.Transforms
 			return sw;
 		}
 		
-		List<KeyValuePair<string, int>> BuildDictionary(List<Statement> dictCreation)
+		static List<KeyValuePair<string, int>> BuildDictionary(List<Statement> dictCreation)
 		{
 			List<KeyValuePair<string, int>> dict = new List<KeyValuePair<string, int>>();
 			for (int i = 0; i < dictCreation.Count; i++) {
@@ -847,7 +847,7 @@ namespace ICSharpCode.Decompiler.Ast.Transforms
 					}
 				}}};
 		
-		PropertyDeclaration TransformAutomaticProperties(PropertyDeclaration property)
+		static PropertyDeclaration TransformAutomaticProperties(PropertyDeclaration property)
 		{
 			PropertyDefinition cecilProperty = property.Annotation<PropertyDefinition>();
 			if (cecilProperty == null || cecilProperty.GetMethod == null || cecilProperty.SetMethod == null)
@@ -868,7 +868,7 @@ namespace ICSharpCode.Decompiler.Ast.Transforms
 			return null;
 		}
 		
-		void RemoveCompilerGeneratedAttribute(AstNodeCollection<AttributeSection> attributeSections)
+		static void RemoveCompilerGeneratedAttribute(AstNodeCollection<AttributeSection> attributeSections)
 		{
 			foreach (AttributeSection section in attributeSections) {
 				foreach (var attr in section.Attributes) {
@@ -929,7 +929,7 @@ namespace ICSharpCode.Decompiler.Ast.Transforms
 					}}
 			}};
 		
-		bool CheckAutomaticEventV4Match(Match m, CustomEventDeclaration ev, bool isAddAccessor)
+		static bool CheckAutomaticEventV4Match(Match m, CustomEventDeclaration ev, bool isAddAccessor)
 		{
 			if (!m.Success)
 				return false;
@@ -943,7 +943,7 @@ namespace ICSharpCode.Decompiler.Ast.Transforms
 			return combineMethod.DeclaringType.FullName == "System.Delegate";
 		}
 		
-		EventDeclaration TransformAutomaticEvents(CustomEventDeclaration ev)
+		static EventDeclaration TransformAutomaticEvents(CustomEventDeclaration ev)
 		{
 			Match m1 = automaticEventPatternV4.Match(ev.AddAccessor);
 			if (!CheckAutomaticEventV4Match(m1, ev, true))
@@ -1019,7 +1019,7 @@ namespace ICSharpCode.Decompiler.Ast.Transforms
 		/// Simplify nested 'try { try {} catch {} } finally {}'.
 		/// This transformation must run after the using/lock tranformations.
 		/// </summary>
-		TryCatchStatement TransformTryCatchFinally(TryCatchStatement tryFinally)
+		static TryCatchStatement TransformTryCatchFinally(TryCatchStatement tryFinally)
 		{
 			if (tryCatchFinallyPattern.IsMatch(tryFinally)) {
 				TryCatchStatement tryCatch = (TryCatchStatement)tryFinally.TryBlock.Statements.Single();
