@@ -743,7 +743,7 @@ namespace ICSharpCode.Decompiler.Ast.Transforms
 			FalseStatement = new OptionalNode("nullStmt", new BlockStatement { Statements = { new Repeat(new AnyNode()) } })
 		};
 		
-		static SwitchStatement TransformSwitchOnString(IfElseStatement node)
+		public SwitchStatement TransformSwitchOnString(IfElseStatement node)
 		{
 			Match m = switchOnStringPattern.Match(node);
 			if (!m.Success)
@@ -802,7 +802,7 @@ namespace ICSharpCode.Decompiler.Ast.Transforms
 			return sw;
 		}
 		
-		static List<KeyValuePair<string, int>> BuildDictionary(List<Statement> dictCreation)
+		List<KeyValuePair<string, int>> BuildDictionary(List<Statement> dictCreation)
 		{
 			if (context.Settings.ObjectOrCollectionInitializers && dictCreation.Count == 1)
 				return BuildDictionaryFromInitializer(dictCreation[0]);
