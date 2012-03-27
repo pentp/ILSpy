@@ -131,7 +131,14 @@ namespace ICSharpCode.Decompiler.Ast.Transforms
 		
 		public override AstNode VisitTryCatchStatement(TryCatchStatement tryCatchStatement, object data)
 		{
-			return TransformTryCatchFinally(tryCatchStatement) ?? base.VisitTryCatchStatement(tryCatchStatement, data);
+			AstNode result = TransformTryCatchFinally(tryCatchStatement);
+			if(result != null) return result;
+			if(context.Settings.LockStatement)
+			{
+				result = TransformLegacyLock(tryCatchStatement);
+				if(result != null) return result;
+			}
+			return base.VisitTryCatchStatement(tryCatchStatement, data);
 		}
 		#endregion
 		
@@ -639,22 +646,9 @@ namespace ICSharpCode.Decompiler.Ast.Transforms
 			Match m2 = lockTryCatchPattern.Match(tryCatch);
 			if (!m2.Success) return null;
 			if (m1.Get<IdentifierExpression>("variable").Single().Identifier == m2.Get<IdentifierExpression>("flag").Single().Identifier) {
-				Expression enter = m2.Get<Expression>("enter").Single();
-				IdentifierExpression exit = m2.Get<IdentifierExpression>("exit").Single();
-				if (!exit.IsMatch(enter)) {
-					// If exit and enter are not the same, then enter must be "exit = ..."
-					AssignmentExpression assign = enter as AssignmentExpression;
-					if (assign == null)
-						return null;
-					if (!exit.IsMatch(assign.Left))
-						return null;
-					enter = assign.Right;
-					// TODO: verify that 'obj' variable can be removed
-				}
+				var l = TransformLock(m2, m2);
+				if(l == null) return null;
 				// TODO: verify that 'flag' variable can be removed
-				// transform the code into a lock statement:
-				LockStatement l = new LockStatement();
-				l.Expression = enter.Detach();
 				l.EmbeddedStatement = ((TryCatchStatement)tryCatch).TryBlock.Detach();
 				((BlockStatement)l.EmbeddedStatement).Statements.First().Remove(); // Remove 'Enter()' call
 				tryCatch.ReplaceWith(l);
@@ -662,6 +656,51 @@ namespace ICSharpCode.Decompiler.Ast.Transforms
 				return l;
 			}
 			return null;
+		}
+
+		static LockStatement TransformLock(Match m1, Match m2)
+		{
+			Expression enter = m1.Get<Expression>("enter").Single();
+			IdentifierExpression exit = m2.Get<IdentifierExpression>("exit").Single();
+			if (!exit.IsMatch(enter)) {
+				// If exit and enter are not the same, then enter must be "exit = ..."
+				AssignmentExpression assign = enter as AssignmentExpression;
+				if (assign == null)
+					return null;
+				if (!exit.IsMatch(assign.Left))
+					return null;
+				enter = assign.Right;
+				// TODO: verify that 'obj' variable can be removed
+			}
+			// transform the code into a lock statement:
+			return new LockStatement { Expression = enter.Detach() };
+		}
+
+		static readonly AstNode legacyLockInitPattern = new ExpressionStatement(
+			new TypePattern(typeof(System.Threading.Monitor)).ToType().Invoke("Enter", new AnyNode("enter")));
+
+		static readonly AstNode legacyLockTryCatchPattern = new TryCatchStatement
+		{
+			TryBlock = new BlockStatement { new Repeat(new AnyNode()).ToStatement() },
+			FinallyBlock = new BlockStatement {
+				new TypePattern(typeof(System.Threading.Monitor)).ToType().Invoke("Exit", new NamedNode("exit", new IdentifierExpression(Pattern.AnyString)))
+			}
+		};
+
+		static LockStatement TransformLegacyLock(TryCatchStatement node)
+		{
+			var invocation = node.PrevSibling;
+			var m1 = legacyLockInitPattern.Match(invocation);
+			if(!m1.Success) return null;
+			var tryCatch = node;
+			var m2 = legacyLockTryCatchPattern.Match(tryCatch);
+			if(!m2.Success) return null;
+			var l = TransformLock(m1, m2);
+			if(l == null) return null;
+			l.EmbeddedStatement = node.TryBlock.Detach();
+			node.ReplaceWith(l);
+			invocation.Remove(); // Remove 'Enter()' call
+			return l;
 		}
 		#endregion
 		
