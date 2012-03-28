@@ -42,6 +42,18 @@ namespace ICSharpCode.ILSpy.TreeNodes
 
 		public ILSpyTreeNode CreateNode(string key, object data)
 		{
+			var s = data as Stream;
+			if (s == null) return CreateNodeFallback(key, data);
+			foreach (string fileExt in imageFileExtensions) {
+				if (key.EndsWith(fileExt, StringComparison.OrdinalIgnoreCase))
+					return new ImageResourceEntryNode(key, s);
+			}
+			return null;
+		}
+
+		[System.Runtime.CompilerServices.MethodImpl(System.Runtime.CompilerServices.MethodImplOptions.NoInlining)]
+		static ILSpyTreeNode CreateNodeFallback(string key, object data)
+		{
 			if (data is System.Drawing.Icon)
 			{
 				MemoryStream s = new MemoryStream();
@@ -53,12 +65,6 @@ namespace ICSharpCode.ILSpy.TreeNodes
 				MemoryStream s = new MemoryStream();
 				((System.Drawing.Image)data).Save(s, System.Drawing.Imaging.ImageFormat.Bmp);
 				return new ImageResourceEntryNode(key, s);
-			}
-			if (!(data is Stream))
-			    return null;
-			foreach (string fileExt in imageFileExtensions) {
-				if (key.EndsWith(fileExt, StringComparison.OrdinalIgnoreCase))
-					return new ImageResourceEntryNode(key, (Stream)data);
 			}
 			return null;
 		}
