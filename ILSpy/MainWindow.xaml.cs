@@ -95,14 +95,6 @@ namespace ICSharpCode.ILSpy
 			this.Loaded += new RoutedEventHandler(MainWindow_Loaded);
 		}
 		
-		void SetWindowBounds(Rect bounds)
-		{
-			this.Left = bounds.Left;
-			this.Top = bounds.Top;
-			this.Width = bounds.Width;
-			this.Height = bounds.Height;
-		}
-		
 		#region Toolbar extensibility
 		[ImportMany("ToolbarCommand", typeof(ICommand))]
 		Lazy<ICommand, IToolbarCommandMetadata>[] toolbarCommands = null;
@@ -194,20 +186,34 @@ namespace ICSharpCode.ILSpy
 				hwndSource.AddHook(WndProc);
 			}
 			// Validate and Set Window Bounds
-			Rect bounds = Rect.Transform(sessionSettings.WindowBounds, source.CompositionTarget.TransformToDevice);
-			var boundsRect = new System.Drawing.Rectangle((int)bounds.Left, (int)bounds.Top, (int)bounds.Width, (int)bounds.Height);
-			bool boundsOK = false;
-			foreach (var screen in System.Windows.Forms.Screen.AllScreens) {
-				var intersection = System.Drawing.Rectangle.Intersect(boundsRect, screen.WorkingArea);
-				if (intersection.Width > 10 && intersection.Height > 10)
-					boundsOK = true;
-			}
-			if (boundsOK)
-				SetWindowBounds(sessionSettings.WindowBounds);
-			else
-				SetWindowBounds(SessionSettings.DefaultWindowBounds);
-			
+			var bounds = sessionSettings.WindowBounds;
+			if (!WindowBoundsValid(source, bounds)) bounds = SessionSettings.DefaultWindowBounds;
+			this.Left = bounds.Left;
+			this.Top = bounds.Top;
+			this.Width = bounds.Width;
+			this.Height = bounds.Height;
 			this.WindowState = sessionSettings.WindowState;
+		}
+
+		static bool WindowBoundsValid(PresentationSource source, Rect bounds)
+		{
+			var i = Rect.Intersect(bounds, SystemParameters.WorkArea);
+			if (i.Width > 10 && i.Height > 10) return true;
+			// the fallback method must not be inlined to avoid loading System.Drawing and System.Windows.Forms in the common code path
+			return WindowBoundsValidAnyScreen(source, bounds);
+		}
+
+		[System.Runtime.CompilerServices.MethodImpl(System.Runtime.CompilerServices.MethodImplOptions.NoInlining)]
+		static bool WindowBoundsValidAnyScreen(PresentationSource source, Rect bounds)
+		{
+			foreach (var screen in System.Windows.Forms.Screen.AllScreens) {
+				var wa = screen.WorkingArea;
+				var i = new Rect(wa.X, wa.Y, wa.Width, wa.Height);
+				i.Transform(source.CompositionTarget.TransformFromDevice);
+				i.Intersect(bounds);
+				if (i.Width > 10 && i.Height > 10) return true;
+			}
+			return false;
 		}
 		
 		unsafe IntPtr WndProc(IntPtr hwnd, int msg, IntPtr wParam, IntPtr lParam, ref bool handled)
