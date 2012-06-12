@@ -173,7 +173,7 @@ namespace ICSharpCode.ILSpy
 			public void Run(AstNode compilationUnit)
 			{
 				foreach (var child in compilationUnit.Children) {
-					if (child is AttributedNode) {
+					if (child is EntityDeclaration) {
 						if (child.Annotation<FieldDefinition>() != field)
 							child.Remove();
 					}
@@ -230,7 +230,6 @@ namespace ICSharpCode.ILSpy
 						return "x86";
 					else
 						return "AnyCPU (64-bit preferred)";
-					break;
 				case TargetArchitecture.AMD64:
 					return "x64";
 				case TargetArchitecture.IA64:
@@ -250,7 +249,6 @@ namespace ICSharpCode.ILSpy
 						return "x86";
 					else
 						return "AnyCPU";
-					break;
 				case TargetArchitecture.AMD64:
 					return "x64";
 				case TargetArchitecture.IA64:
@@ -578,7 +576,7 @@ namespace ICSharpCode.ILSpy
 					((ComposedType)astType).PointerRank--;
 			}
 
-			astType.AcceptVisitor(new CSharpOutputVisitor(w, new CSharpFormattingOptions()), null);
+			astType.AcceptVisitor(new CSharpOutputVisitor(w, FormattingOptionsFactory.CreateAllman()));
 			return w.ToString();
 		}
 
