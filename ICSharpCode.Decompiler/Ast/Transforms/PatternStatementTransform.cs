@@ -692,8 +692,7 @@ namespace ICSharpCode.Decompiler.Ast.Transforms
 			var invocation = node.PrevSibling;
 			var m1 = legacyLockInitPattern.Match(invocation);
 			if(!m1.Success) return null;
-			var tryCatch = node;
-			var m2 = legacyLockTryCatchPattern.Match(tryCatch);
+			var m2 = legacyLockTryCatchPattern.Match(node);
 			if(!m2.Success) return null;
 			var l = TransformLock(m1, m2);
 			if(l == null) return null;

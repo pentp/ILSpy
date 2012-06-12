@@ -106,6 +106,7 @@ namespace ICSharpCode.ILSpy.TextView
 			textEditor.TextArea.TextView.MouseHoverStopped += TextViewMouseHoverStopped;
 			textEditor.SetBinding(TextEditor.FontFamilyProperty, new Binding { Source = DisplaySettingsPanel.CurrentDisplaySettings, Path = new PropertyPath("SelectedFont") });
 			textEditor.SetBinding(TextEditor.FontSizeProperty, new Binding { Source = DisplaySettingsPanel.CurrentDisplaySettings, Path = new PropertyPath("SelectedFontSize") });
+			SetIndentationSize();
 			
 			// add marker service & margin
 			iconMargin = new IconBarMargin((manager = new IconBarManager()));
@@ -155,6 +156,7 @@ namespace ICSharpCode.ILSpy.TextView
 			if (e.PropertyName == "ShowLineNumbers") {
 				ShowLineMargin();
 			}
+			if (e.PropertyName == "IndentationSize") SetIndentationSize();
 		}
 		
 		void ShowLineMargin()
@@ -164,6 +166,11 @@ namespace ICSharpCode.ILSpy.TextView
 					margin.Visibility = DisplaySettingsPanel.CurrentDisplaySettings.ShowLineNumbers ? Visibility.Visible : Visibility.Collapsed;
 				}
 			}
+		}
+
+		void SetIndentationSize()
+		{
+			textEditor.Options.IndentationSize = DisplaySettingsPanel.CurrentDisplaySettings.IndentationSize;
 		}
 		
 		#endregion

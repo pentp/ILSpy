@@ -58,7 +58,13 @@
 			</Grid>
 		</GroupBox>
 		<GroupBox Header="Other options" Grid.Row="1">
-			<CheckBox Margin="3,3" IsChecked="{Binding ShowLineNumbers}">Show line numbers</CheckBox>
+			<StackPanel>
+				<CheckBox Margin="3,3" IsChecked="{Binding ShowLineNumbers}">Show line numbers</CheckBox>
+				<StackPanel Orientation="Horizontal">
+					<Label>Indentation size:</Label>
+					<TextBox Text="{Binding IndentationSize}" Width="30" />
+				</StackPanel>
+			</StackPanel>
 		</GroupBox>
 	</Grid>
 </UserControl>

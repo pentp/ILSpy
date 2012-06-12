@@ -70,6 +70,20 @@ namespace ICSharpCode.ILSpy.Options
 				}
 			}
 		}
+
+		int indentationSize;
+
+		public int IndentationSize
+		{
+			get { return indentationSize; }
+			set
+			{
+				if (indentationSize != value) {
+					indentationSize = value;
+					OnPropertyChanged("IndentationSize");
+				}
+			}
+		}
 		
 		bool showLineNumbers;
 		
@@ -87,6 +101,7 @@ namespace ICSharpCode.ILSpy.Options
 		{
 			this.SelectedFont = s.selectedFont;
 			this.SelectedFontSize = s.selectedFontSize;
+			this.IndentationSize = s.indentationSize;
 			this.ShowLineNumbers = s.showLineNumbers;
 		}
 	}
