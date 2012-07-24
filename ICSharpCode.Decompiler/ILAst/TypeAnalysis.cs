@@ -386,7 +386,9 @@ namespace ICSharpCode.Decompiler.ILAst
 					{
 						TypeReference type = (TypeReference)expr.Operand;
 						var argType = InferTypeForExpression(expr.Arguments[0], null);
-						if (argType is PointerType || argType is ByReferenceType) {
+						// because there is no ldind.u8 opcode, the type operand should behave as uint64 for pointer types if that is expected
+						if (argType is PointerType && expectedType != null && expectedType.MetadataType == MetadataType.UInt64 && type.MetadataType == MetadataType.Int64) type = expectedType;
+						else if (argType is PointerType || argType is ByReferenceType) {
 							var elementType = ((TypeSpecification)argType).ElementType;
 							int infoAmount = GetInformationAmount(elementType);
 							if (infoAmount == 1 && GetInformationAmount(type) == 8) {

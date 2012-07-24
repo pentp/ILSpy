@@ -150,4 +150,24 @@ public class TypeAnalysisTests
 	{
 		return Math.Abs(a - b);
 	}
+
+	public ulong LoadU8FromU8Ref(ref ulong p)
+	{
+		return p;
+	}
+
+	public ulong LoadU8FromI8Ref(ref long p)
+	{
+		return (ulong)p;
+	}
+
+	public unsafe ulong LoadU8FromI8Ptr(long* p)
+	{
+		return *(ulong*)p;
+	}
+
+	public unsafe ulong LoadU8FromStructPtr(DateTime* p)
+	{
+		return *(ulong*)p;
+	}
 }
