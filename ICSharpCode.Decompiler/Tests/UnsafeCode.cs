@@ -112,6 +112,14 @@ public class UnsafeCode
 			*ptr2 = 'e';
 		}
 	}
+
+	public unsafe byte FixedRef(ref int i)
+	{
+		fixed (int* ptr = &i)
+		{
+			return ((byte*)ptr)[2];
+		}
+	}
 	
 	public unsafe string StackAlloc(int count)
 	{
