@@ -297,11 +297,10 @@ namespace ICSharpCode.Decompiler.Ast
 								arg2 = DivideBySize(arg2, ((PointerType)byteCode.InferredType).ElementType);
 								boe = new Ast.BinaryOperatorExpression(arg1, BinaryOperatorType.Add, arg2);
 								boe.AddAnnotation(IntroduceUnsafeModifier.PointerArithmeticAnnotation);
-							} else if (byteCode.Arguments[1].ExpectedType is PointerType) {
-								arg1 = DivideBySize(arg1, ((PointerType)byteCode.InferredType).ElementType);
-								boe = new Ast.BinaryOperatorExpression(arg1, BinaryOperatorType.Add, arg2);
-								boe.AddAnnotation(IntroduceUnsafeModifier.PointerArithmeticAnnotation);
 							} else {
+								if (byteCode.Arguments[1].ExpectedType is PointerType) {
+									arg1 = DivideBySize(arg1, ((PointerType)byteCode.InferredType).ElementType);
+								}
 								boe = new Ast.BinaryOperatorExpression(arg1, BinaryOperatorType.Add, arg2);
 							}
 						} else {
@@ -315,32 +314,28 @@ namespace ICSharpCode.Decompiler.Ast
 				case ILCode.Sub_Ovf_Un:
 					{
 						BinaryOperatorExpression boe;
-						if (byteCode.InferredType is PointerType) {
-							if (byteCode.Arguments[0].ExpectedType is PointerType) {
-								arg2 = DivideBySize(arg2, ((PointerType)byteCode.InferredType).ElementType);
-								boe = new Ast.BinaryOperatorExpression(arg1, BinaryOperatorType.Subtract, arg2);
-								boe.WithAnnotation(IntroduceUnsafeModifier.PointerArithmeticAnnotation);
-							} else {
-								boe = new Ast.BinaryOperatorExpression(arg1, BinaryOperatorType.Subtract, arg2);
-							}
+						if (byteCode.InferredType is PointerType && byteCode.Arguments[0].ExpectedType is PointerType) {
+							arg2 = DivideBySize(arg2, ((PointerType)byteCode.InferredType).ElementType);
+							boe = new Ast.BinaryOperatorExpression(arg1, BinaryOperatorType.Subtract, arg2);
+							boe.AddAnnotation(IntroduceUnsafeModifier.PointerArithmeticAnnotation);
 						} else {
 							boe = new Ast.BinaryOperatorExpression(arg1, BinaryOperatorType.Subtract, arg2);
 						}
 						boe.AddAnnotation(byteCode.Code == ILCode.Sub ? AddCheckedBlocks.UncheckedAnnotation : AddCheckedBlocks.CheckedAnnotation);
 						return boe;
 					}
-					case ILCode.Div:        return new Ast.BinaryOperatorExpression(arg1, BinaryOperatorType.Divide, arg2);
+					case ILCode.Div:
 					case ILCode.Div_Un:     return new Ast.BinaryOperatorExpression(arg1, BinaryOperatorType.Divide, arg2);
 					case ILCode.Mul:        return new Ast.BinaryOperatorExpression(arg1, BinaryOperatorType.Multiply, arg2).WithAnnotation(AddCheckedBlocks.UncheckedAnnotation);
-					case ILCode.Mul_Ovf:    return new Ast.BinaryOperatorExpression(arg1, BinaryOperatorType.Multiply, arg2).WithAnnotation(AddCheckedBlocks.CheckedAnnotation);
+					case ILCode.Mul_Ovf:
 					case ILCode.Mul_Ovf_Un: return new Ast.BinaryOperatorExpression(arg1, BinaryOperatorType.Multiply, arg2).WithAnnotation(AddCheckedBlocks.CheckedAnnotation);
-					case ILCode.Rem:        return new Ast.BinaryOperatorExpression(arg1, BinaryOperatorType.Modulus, arg2);
+					case ILCode.Rem:
 					case ILCode.Rem_Un:     return new Ast.BinaryOperatorExpression(arg1, BinaryOperatorType.Modulus, arg2);
 					case ILCode.And:        return new Ast.BinaryOperatorExpression(arg1, BinaryOperatorType.BitwiseAnd, arg2);
 					case ILCode.Or:         return new Ast.BinaryOperatorExpression(arg1, BinaryOperatorType.BitwiseOr, arg2);
 					case ILCode.Xor:        return new Ast.BinaryOperatorExpression(arg1, BinaryOperatorType.ExclusiveOr, arg2);
 					case ILCode.Shl:        return new Ast.BinaryOperatorExpression(arg1, BinaryOperatorType.ShiftLeft, arg2);
-					case ILCode.Shr:        return new Ast.BinaryOperatorExpression(arg1, BinaryOperatorType.ShiftRight, arg2);
+					case ILCode.Shr:
 					case ILCode.Shr_Un:     return new Ast.BinaryOperatorExpression(arg1, BinaryOperatorType.ShiftRight, arg2);
 					case ILCode.Neg:        return new Ast.UnaryOperatorExpression(UnaryOperatorType.Minus, arg1).WithAnnotation(AddCheckedBlocks.UncheckedAnnotation);
 					case ILCode.Not:        return new Ast.UnaryOperatorExpression(UnaryOperatorType.BitNot, arg1);
@@ -914,21 +909,17 @@ namespace ICSharpCode.Decompiler.Ast
 				expr = cast.Expression.Detach();
 			
 			Expression sizeOfExpression;
-			switch (TypeAnalysis.GetInformationAmount(type)) {
+			int size = TypeAnalysis.GetInformationAmount(type);
+			switch (size) {
 				case 1:
 				case 8:
-					sizeOfExpression = new PrimitiveExpression(1);
-					break;
 				case 16:
-					sizeOfExpression = new PrimitiveExpression(2);
-					break;
 				case 32:
-					sizeOfExpression = new PrimitiveExpression(4);
-					break;
 				case 64:
-					sizeOfExpression = new PrimitiveExpression(8);
+					sizeOfExpression = new PrimitiveExpression(size = (size + 7) / 8);
 					break;
 				default:
+					size = 0;
 					sizeOfExpression = new SizeOfExpression { Type = AstBuilder.ConvertType(type) };
 					break;
 			}
@@ -937,9 +928,17 @@ namespace ICSharpCode.Decompiler.Ast
 			if (boe != null && boe.Operator == BinaryOperatorType.Multiply && sizeOfExpression.IsMatch(boe.Right))
 				return boe.Left.Detach();
 			
+			if (size == 1) return expr;
+
 			if (sizeOfExpression.IsMatch(expr))
 				return new PrimitiveExpression(1);
 			
+			if (size != 0) {
+				var primitive = expr as PrimitiveExpression;
+				if (primitive != null && primitive.Value is int)
+					return new PrimitiveExpression((int)primitive.Value / size);
+			}
+
 			return new BinaryOperatorExpression(expr, BinaryOperatorType.Divide, sizeOfExpression);
 		}
 		

@@ -120,15 +120,42 @@ public class UnsafeCode
 			return ((byte*)ptr)[2];
 		}
 	}
+
+	public unsafe int PointerArithmeticIndexer(int* p, int i)
+	{
+		return p[i];
+	}
+
+	public unsafe int PointerArithmeticDereference(int* p, int i)
+	{
+		return *(i + p);
+	}
+
+	public unsafe long PointerArithmeticConstant(long* p)
+	{
+		return p[123];
+	}
 	
 	public unsafe string StackAlloc(int count)
 	{
-		char* ptr = stackalloc char[count];
+		char* d = stackalloc char[count];
 		for (int i = 0; i < count; i++)
 		{
-			ptr[i] = (char)i;
+			d[i] = (char)i;
 		}
-		return this.PointerReferenceExpression((double*)ptr);
+		return this.PointerReferenceExpression((double*)d);
+	}
+
+	public unsafe string StackAllocConstant()
+	{
+		double* d = stackalloc double[123];
+		return this.PointerReferenceExpression(d);
+	}
+
+	public unsafe string StackAllocByteConstant()
+	{
+		byte* d = stackalloc byte[123];
+		return this.PointerReferenceExpression((double*)d);
 	}
 	
 	unsafe ~UnsafeCode()

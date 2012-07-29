@@ -446,7 +446,14 @@ namespace ICSharpCode.Decompiler.ILAst
 					return (TypeReference)expr.Operand;
 				case ILCode.Localloc:
 					if (forceInferChildren) {
-						InferTypeForExpression(expr.Arguments[0], typeSystem.Int32);
+						var arg = expr.Arguments[0];
+						InferTypeForExpression(arg, typeSystem.UIntPtr);
+						// C# stackalloc requires an int32 parameter while IL localloc requires an UIntPtr parameter, thus the C# compiler always inserts a conv.u IL instruction
+						if (arg.Code == ILCode.Mul_Ovf_Un) arg = arg.Arguments[0];
+						if (arg.Code == ILCode.Conv_U && (arg = arg.Arguments[0]).ExpectedType.MetadataType != MetadataType.Int32
+							&& arg.InferredType.MetadataType == MetadataType.Int32) {
+							InferTypeForExpression(arg, arg.InferredType);
+						}
 					}
 					if (expectedType is PointerType)
 						return expectedType;
@@ -880,18 +887,29 @@ namespace ICSharpCode.Decompiler.ILAst
 		
 		TypeReference HandleConversion(int targetBitSize, bool targetSigned, ILExpression arg, TypeReference expectedType, TypeReference targetType)
 		{
-			if (targetBitSize >= NativeInt && expectedType is PointerType) {
-				InferTypeForExpression(arg, expectedType);
-				return expectedType;
-			}
 			TypeReference argType = InferTypeForExpression(arg, null);
-			if (targetBitSize >= NativeInt && argType is ByReferenceType) {
-				// conv instructions on managed references mean that the GC should stop tracking them, so they become pointers:
-				PointerType ptrType = new PointerType(((ByReferenceType)argType).ElementType);
-				InferTypeForExpression(arg, ptrType);
-				return ptrType;
-			} else if (targetBitSize >= NativeInt && argType is PointerType) {
-				return argType;
+			if (targetBitSize == NativeInt) {
+				if (argType is ByReferenceType) {
+					// conv instructions on managed references mean that the GC should stop tracking them, so they become pointers:
+					var ptrType = expectedType as PointerType ?? new PointerType(((ByReferenceType)argType).ElementType);
+					InferTypeForExpression(arg, ptrType);
+					return ptrType;
+				}
+				if (argType is PointerType) {
+					if (expectedType is PointerType && !IsSameType(expectedType, argType)) {
+						InferTypeForExpression(arg, expectedType);
+						return expectedType;
+					}
+					return argType;
+				}
+				var argSize = GetInformationAmount(argType);
+				if (argSize >= 8 && argSize <= NativeInt) {
+					if (IsSigned(argType) == targetSigned || argSize < 32 && targetSigned) return targetType;
+					if (expectedType is PointerType) {
+						InferTypeForExpression(arg, expectedType);
+						return expectedType;
+					}
+				}
 			}
 			TypeReference resultType = (GetInformationAmount(expectedType) == targetBitSize && IsSigned(expectedType) == targetSigned) ? expectedType : targetType;
 			arg.ExpectedType = resultType; // store the expected type in the argument so that AstMethodBodyBuilder will insert a cast
