@@ -170,4 +170,15 @@ public class TypeAnalysisTests
 	{
 		return *(ulong*)p;
 	}
+
+	public void UnsignedArrayIndexer(int[] array, uint index)
+	{
+		array[index] = array[index];
+		int.TryParse(null, out array[index]);
+	}
+	
+	public void UnsignedArrayIndexer<T>(T[] array, uint index)
+	{
+		array[index] = array[index];
+	}
 }

@@ -659,20 +659,20 @@ namespace ICSharpCode.Decompiler.ILAst
 					{
 						ArrayType arrayType = InferTypeForExpression(expr.Arguments[0], null) as ArrayType;
 						if (forceInferChildren) {
-							InferTypeForExpression(expr.Arguments[1], typeSystem.Int32);
+							InferArrayIndexer(expr);
 						}
 						return arrayType != null ? arrayType.ElementType : null;
 					}
 				case ILCode.Ldelem_Any:
 					if (forceInferChildren) {
-						InferTypeForExpression(expr.Arguments[1], typeSystem.Int32);
+						InferArrayIndexer(expr);
 					}
 					return (TypeReference)expr.Operand;
 				case ILCode.Ldelema:
 					{
 						ArrayType arrayType = InferTypeForExpression(expr.Arguments[0], null) as ArrayType;
 						if (forceInferChildren)
-							InferTypeForExpression(expr.Arguments[1], typeSystem.Int32);
+							InferArrayIndexer(expr);
 						return arrayType != null ? new ByReferenceType(arrayType.ElementType) : null;
 					}
 				case ILCode.Stelem_I:
@@ -687,7 +687,7 @@ namespace ICSharpCode.Decompiler.ILAst
 					{
 						ArrayType arrayType = InferTypeForExpression(expr.Arguments[0], null) as ArrayType;
 						if (forceInferChildren) {
-							InferTypeForExpression(expr.Arguments[1], typeSystem.Int32);
+							InferArrayIndexer(expr);
 							if (arrayType != null) {
 								InferTypeForExpression(expr.Arguments[2], arrayType.ElementType);
 							}
@@ -1092,6 +1092,15 @@ namespace ICSharpCode.Decompiler.ILAst
 				left.InferredType = DoInferTypeForExpression(left, left.ExpectedType, forceInferChildren);
 				right.InferredType = DoInferTypeForExpression(right, right.ExpectedType, forceInferChildren);
 				return left.ExpectedType;
+			}
+		}
+
+		void InferArrayIndexer(ILExpression expr)
+		{
+			expr = expr.Arguments[1];
+			var type = InferTypeForExpression(expr, typeSystem.Int32);
+			if (type.MetadataType == MetadataType.IntPtr || type.MetadataType == MetadataType.UIntPtr) {
+				InferTypeForExpression(expr, type);
 			}
 		}
 		
