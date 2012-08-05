@@ -148,7 +148,7 @@ namespace ICSharpCode.Decompiler.Tests
 			TestFile(@"..\..\Tests\UndocumentedExpressions.cs");
 		}
 		
-		[Test, Ignore("has incorrect casts to IntPtr")]
+		[Test]
 		public void UnsafeCode()
 		{
 			TestFile(@"..\..\Tests\UnsafeCode.cs");

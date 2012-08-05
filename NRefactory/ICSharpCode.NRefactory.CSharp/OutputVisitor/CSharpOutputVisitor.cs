@@ -344,11 +344,13 @@ namespace ICSharpCode.NRefactory.CSharp
 			// (for +, - and &, this can happen with unary operators;
 			// for ?, this can happen in "a is int? ? b : c" or "a as int? ?? 0";
 			// and for /, this can happen with "1/ *ptr" or "1/ //comment".)
+			// If a destructor has modifiers then there should be a space before ~
 			if (lastWritten == LastWritten.Plus && token [0] == '+'
 				|| lastWritten == LastWritten.Minus && token [0] == '-'
 				|| lastWritten == LastWritten.Ampersand && token [0] == '&'
 				|| lastWritten == LastWritten.QuestionMark && token [0] == '?'
-				|| lastWritten == LastWritten.Division && token [0] == '*') {
+				|| lastWritten == LastWritten.Division && token [0] == '*'
+				|| lastWritten == LastWritten.KeywordOrIdentifier && token[0] == '~') {
 				formatter.Space();
 			}
 			formatter.WriteToken(token);
