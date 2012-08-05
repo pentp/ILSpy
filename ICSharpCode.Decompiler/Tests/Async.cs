@@ -68,21 +68,21 @@ public class Async
 	
 	public async void StreamCopyTo(Stream destination, int bufferSize)
 	{
-		byte[] array = new byte[bufferSize];
+		byte[] buffer = new byte[bufferSize];
 		int count;
-		while ((count = await destination.ReadAsync(array, 0, array.Length)) != 0)
+		while ((count = await destination.ReadAsync(buffer, 0, buffer.Length)) != 0)
 		{
-			await destination.WriteAsync(array, 0, count);
+			await destination.WriteAsync(buffer, 0, count);
 		}
 	}
 	
 	public async void StreamCopyToWithConfigureAwait(Stream destination, int bufferSize)
 	{
-		byte[] array = new byte[bufferSize];
+		byte[] buffer = new byte[bufferSize];
 		int count;
-		while ((count = await destination.ReadAsync(array, 0, array.Length).ConfigureAwait(false)) != 0)
+		while ((count = await destination.ReadAsync(buffer, 0, buffer.Length).ConfigureAwait(false)) != 0)
 		{
-			await destination.WriteAsync(array, 0, count).ConfigureAwait(false);
+			await destination.WriteAsync(buffer, 0, count).ConfigureAwait(false);
 		}
 	}
 	
@@ -96,12 +96,12 @@ public class Async
 	
 	public async Task<int> AwaitInForEach(IEnumerable<Task<int>> elements)
 	{
-		int num = 0;
+		int result = 0;
 		foreach (Task<int> current in elements)
 		{
-			num += await current;
+			result += await current;
 		}
-		return num;
+		return result;
 	}
 	
 	public async Task TaskMethodWithoutAwaitButWithExceptionHandling()
