@@ -38,7 +38,7 @@ namespace ICSharpCode.Decompiler.Ast.Transforms
 			for (AstNode child = node.FirstChild; child != null; child = child.NextSibling) {
 				result |= child.AcceptVisitor(this, data);
 			}
-			if (result && node is EntityDeclaration && !(node is Accessor)) {
+			if (result && node is EntityDeclaration && !(node is Accessor) && !(node is FieldDeclaration)) {
 				((EntityDeclaration)node).Modifiers |= Modifiers.Unsafe;
 				return false;
 			}
@@ -93,6 +93,28 @@ namespace ICSharpCode.Decompiler.Ast.Transforms
 				pre.CopyAnnotationsFrom(uoe);
 				pre.CopyAnnotationsFrom(memberReferenceExpression);
 				memberReferenceExpression.ReplaceWith(pre);
+			} else if (!result) {
+				var type = memberReferenceExpression.Annotation<TypeInformation>();
+				if (type != null) result = type.InferredType is Mono.Cecil.PointerType;
+				else {
+					var field = memberReferenceExpression.Annotation<Mono.Cecil.FieldReference>();
+					if (field != null) result = field.FieldType is Mono.Cecil.PointerType;
+				}
+			}
+			return result;
+		}
+
+		public override bool VisitInvocationExpression(InvocationExpression invocationExpression, object data)
+		{
+			var result = base.VisitInvocationExpression(invocationExpression, data);
+			if (!result) {
+				var method = invocationExpression.Annotation<Mono.Cecil.MethodReference>();
+				if (method != null && method.HasParameters)
+					foreach (var p in method.Parameters)
+						if (p.ParameterType is Mono.Cecil.PointerType) {
+							result = true;
+							break;
+						}
 			}
 			return result;
 		}

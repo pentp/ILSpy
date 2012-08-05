@@ -20,6 +20,11 @@ using System;
 
 public class UnsafeCode
 {
+	public unsafe struct FieldContainer
+	{
+		public int* field;
+	}
+
 	public unsafe int* NullPointer
 	{
 		get
@@ -158,6 +163,16 @@ public class UnsafeCode
 		return this.PointerReferenceExpression((double*)d);
 	}
 	
+	public unsafe void AssignPointerValue(UnsafeCode.FieldContainer container)
+	{
+		container.field = null;
+	}
+
+	public unsafe void CallMethodWithPointer()
+	{
+		this.PassPointerAsRefParameter(null);
+	}
+
 	unsafe ~UnsafeCode()
 	{
 		this.PassPointerAsRefParameter(this.NullPointer);
