@@ -752,7 +752,7 @@ namespace ICSharpCode.Decompiler.Ast
 									for (int i = 0; i < args.Count; i++) {
 										atce.Initializers.Add(
 											new NamedExpression {
-												Identifier = ctor.Parameters[i].Name,
+												Name = ctor.Parameters[i].Name,
 												Expression = args[i]
 											});
 									}
@@ -802,7 +802,7 @@ namespace ICSharpCode.Decompiler.Ast
 								MemberReferenceExpression mre = m.Get<MemberReferenceExpression>("left").Single();
 								initializer.Elements.Add(
 									new NamedExpression {
-										Identifier = mre.MemberName,
+										Name = mre.MemberName,
 										Expression = m.Get<Expression>("right").Single().Detach()
 									}.CopyAnnotationsFrom(mre));
 							} else {
@@ -846,7 +846,7 @@ namespace ICSharpCode.Decompiler.Ast
 					args[args.Count - 1].AddAnnotation(new ParameterDeclarationAnnotation(byteCode));
 					return args[args.Count - 1];
 				case ILCode.Await:
-					return new UnaryOperatorExpression(UnaryOperatorType.Await, arg1);
+					return new UnaryOperatorExpression(UnaryOperatorType.Await, UnpackDirectionExpression(arg1));
 				case ILCode.NullableOf:
 				case ILCode.ValueOf: 
 					return arg1;
@@ -976,10 +976,7 @@ namespace ICSharpCode.Decompiler.Ast
 				
 				// Unpack any DirectionExpression that is used as target for the call
 				// (calling methods on value types implicitly passes the first argument by reference)
-				if (target is DirectionExpression) {
-					target = ((DirectionExpression)target).Expression;
-					target.Remove(); // detach from DirectionExpression
-				}
+				target = UnpackDirectionExpression(target);
 				
 				if (cecilMethodDef != null) {
 					// convert null.ToLower() to ((string)null).ToLower()
@@ -1077,6 +1074,15 @@ namespace ICSharpCode.Decompiler.Ast
 			// Default invocation
 			AdjustArgumentsForMethodCall(cecilMethodDef ?? cecilMethod, methodArgs);
 			return target.Invoke(cecilMethod.Name, ConvertTypeArguments(cecilMethod), methodArgs).WithAnnotation(cecilMethod);
+		}
+		
+		static Expression UnpackDirectionExpression(Expression target)
+		{
+			if (target is DirectionExpression) {
+				return ((DirectionExpression)target).Expression.Detach();
+			} else {
+				return target;
+			}
 		}
 		
 		static void AdjustArgumentsForMethodCall(MethodReference cecilMethod, List<Expression> methodArgs)

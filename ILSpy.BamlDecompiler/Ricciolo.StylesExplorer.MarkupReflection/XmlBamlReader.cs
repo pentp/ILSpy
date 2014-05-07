@@ -75,10 +75,6 @@ namespace Ricciolo.StylesExplorer.MarkupReflection
 		int currentKey;
 		List<KeyMapping> keys = new List<KeyMapping>();
 		
-		KeyMapping LastKey {
-			get { return keys.LastOrDefault(); }
-		}
-		
 		void LayerPop()
 		{
 			layer.Pop();
@@ -686,13 +682,21 @@ namespace Ricciolo.StylesExplorer.MarkupReflection
 				return declaration;
 			} else {
 				identifier = (short)-identifier;
-				bool isNotKey = (identifier > 0xe8);
-				if (isNotKey)
-					identifier = (short)(identifier - 0xe8);
+				bool isKey = true;
+				if (identifier > 0xe8 && identifier < 0x1d0) {
+					isKey = false;
+					identifier -= 0xe8;
+				} else if (identifier > 0x1d0 && identifier < 0x1d3) {
+					identifier -= 0xe7;
+				} else if (identifier > 0x1d3 && identifier < 0x1d6) {
+					identifier -= 0xea;
+					isKey = false;
+				}
 				ResourceName resource;
 				if (!KnownInfo.KnownResourceTable.TryGetValue(identifier, out resource))
+//					resource = new ResourceName("???Resource" + identifier + "???");
 					throw new ArgumentException("Cannot find resource name " + identifier);
-				if (!isNotKey)
+				if (isKey)
 					return new ResourceName(resource.Name + "Key");
 				return resource;
 			}
@@ -908,11 +912,7 @@ namespace Ricciolo.StylesExplorer.MarkupReflection
 			short identifier = reader.ReadInt16();
 			string text = reader.ReadString();
 
-			PropertyDeclaration pd = this.GetPropertyDeclaration(identifier);
-			XmlBamlProperty property = new XmlBamlProperty(elements.Peek(), PropertyType.Value, pd);
-			property.Value = text;
-
-			nodes.Enqueue(property);
+			EnqueueProperty(identifier, text);
 		}
 
 		void ReadPropertyWithConverter()
@@ -921,11 +921,41 @@ namespace Ricciolo.StylesExplorer.MarkupReflection
 			string text = reader.ReadString();
 			reader.ReadInt16();
 
+			EnqueueProperty(identifier, text);
+		}
+		
+		bool HaveSeenNestedElement()
+		{
+			XmlBamlElement element = elements.Peek();
+			int elementIndex = nodes.IndexOf(element);
+			for (int i = elementIndex + 1; i < nodes.Count; i++)
+			{
+				if (nodes[i] is XmlBamlEndElement)
+					return true;
+			}
+			return false;
+		}
+		
+		void EnqueueProperty(short identifier, string text)
+		{
 			PropertyDeclaration pd = this.GetPropertyDeclaration(identifier);
-			XmlBamlProperty property = new XmlBamlProperty(elements.Peek(), PropertyType.Value, pd);
-			property.Value = text;
-
-			nodes.Enqueue(property);
+			XmlBamlElement element = FindXmlBamlElement();
+			// if we've already read a nested element for the current element, this property must be a nested element as well
+			if (HaveSeenNestedElement())
+			{
+				XmlBamlPropertyElement property = new XmlBamlPropertyElement(element, PropertyType.Complex, pd);
+				
+				nodes.Enqueue(property);
+				nodes.Enqueue(new XmlBamlText(text));
+				nodes.Enqueue(new XmlBamlEndElement(property));
+			}
+			else
+			{
+				XmlBamlProperty property = new XmlBamlProperty(element, PropertyType.Value, pd);
+				property.Value = text;
+				
+				nodes.Enqueue(property);
+			}
 		}
 
 		void ReadAttributeInfo()
@@ -1089,13 +1119,20 @@ namespace Ricciolo.StylesExplorer.MarkupReflection
 			complexPropertyOpened--;
 			// this property could be a markup extension
 			// try to convert it
+			int elementIndex = nodes.IndexOf(propertyElement.Parent);
 			int start = nodes.IndexOf(propertyElement) + 1;
 			IEnumerator<XmlBamlNode> enumerator = nodes.GetEnumerator();
 			
 			// move enumerator to the start of this property value
-			for (int i = 0; i < start && enumerator.MoveNext(); i++) ;
+			// note whether there are any child elements before this one
+			bool anyChildElement = false;
+			for (int i = 0; i < start && enumerator.MoveNext(); i++)
+			{
+				if (i > elementIndex && i < start - 1 && (enumerator.Current is XmlBamlEndElement))
+					anyChildElement = true;
+			}
 
-			if (IsExtension(enumerator) && start < nodes.Count - 1) {
+			if (!anyChildElement && IsExtension(enumerator) && start < nodes.Count - 1) {
 				start--;
 				nodes.RemoveAt(start);
 				nodes.RemoveLast();
@@ -1350,7 +1387,10 @@ namespace Ricciolo.StylesExplorer.MarkupReflection
 			short identifier = reader.ReadInt16();
 			byte flags = reader.ReadByte();
 			TypeDeclaration declaration = GetTypeDeclaration(identifier);
-			LastKey.StaticResources.Add(declaration);
+			var lastKey = keys.LastOrDefault();
+			if (lastKey == null)
+				throw new InvalidOperationException("No key mapping found for StaticResourceStart!");
+			lastKey.StaticResources.Add(declaration);
 			XmlBamlElement element;
 			if (elements.Any())
 				element = new XmlBamlElement(elements.Peek());
@@ -1421,8 +1461,11 @@ namespace Ricciolo.StylesExplorer.MarkupReflection
 			} else {
 				resource = this.stringTable[typeIdentifier];
 			}
-
-			LastKey.StaticResources.Add(resource);
+			
+			var lastKey = keys.LastOrDefault();
+			if (lastKey == null)
+				throw new InvalidOperationException("No key mapping found for OptimizedStaticResource!");
+			lastKey.StaticResources.Add(resource);
 		}
 
 		string GetTemplateBindingExtension(PropertyDeclaration propertyDeclaration)
@@ -1518,8 +1561,10 @@ namespace Ricciolo.StylesExplorer.MarkupReflection
 
 		object GetStaticResource(short identifier)
 		{
-			int keyIndex = currentKey - 1;
-			while (keyIndex >= 0 && !keys[keyIndex].HasStaticResources)
+			int keyIndex = Math.Max(0, currentKey - 1);
+			while (keyIndex > keys.Count)
+				keyIndex--;
+			while (keyIndex >= 0 && !keys[keyIndex].HasStaticResource(identifier))
 				keyIndex--;
 			if (keyIndex >= 0 && identifier < keys[keyIndex].StaticResources.Count)
 				return keys[keyIndex].StaticResources[(int)identifier];

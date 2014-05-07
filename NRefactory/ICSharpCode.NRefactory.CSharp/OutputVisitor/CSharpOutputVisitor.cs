@@ -919,7 +919,7 @@ namespace ICSharpCode.NRefactory.CSharp
 		public void VisitNamedArgumentExpression(NamedArgumentExpression namedArgumentExpression)
 		{
 			StartNode(namedArgumentExpression);
-			namedArgumentExpression.IdentifierToken.AcceptVisitor(this);
+			namedArgumentExpression.NameToken.AcceptVisitor(this);
 			WriteToken(Roles.Colon);
 			Space();
 			namedArgumentExpression.Expression.AcceptVisitor(this);
@@ -929,7 +929,7 @@ namespace ICSharpCode.NRefactory.CSharp
 		public void VisitNamedExpression(NamedExpression namedExpression)
 		{
 			StartNode(namedExpression);
-			namedExpression.IdentifierToken.AcceptVisitor(this);
+			namedExpression.NameToken.AcceptVisitor(this);
 			Space();
 			WriteToken(Roles.Assign);
 			Space();
@@ -1009,6 +1009,14 @@ namespace ICSharpCode.NRefactory.CSharp
 			EndNode(primitiveExpression);
 		}
 		
+		public static string PrintPrimitiveValue(object val)
+		{
+			StringWriter writer = new StringWriter();
+			CSharpOutputVisitor visitor = new CSharpOutputVisitor(writer, new CSharpFormattingOptions());
+			visitor.WritePrimitiveValue(val);
+			return writer.ToString();
+		}
+		
 		void WritePrimitiveValue(object val)
 		{
 			if (val == null) {
@@ -1051,6 +1059,12 @@ namespace ICSharpCode.NRefactory.CSharp
 					}
 					return;
 				}
+				if (f == 0 && 1 / f == double.NegativeInfinity) {
+					// negative zero is a special case
+					// (again, not a primitive expression, but it's better to handle
+					// the special case here than to do it in all code generators)
+					formatter.WriteToken("-");
+				}
 				formatter.WriteToken(f.ToString("R", NumberFormatInfo.InvariantInfo) + "f");
 				lastWritten = LastWritten.Other;
 			} else if (val is double) {
@@ -1068,6 +1082,12 @@ namespace ICSharpCode.NRefactory.CSharp
 						WriteIdentifier("NaN");
 					}
 					return;
+				}
+				if (f == 0 && 1 / f == double.NegativeInfinity) {
+					// negative zero is a special case
+					// (again, not a primitive expression, but it's better to handle
+					// the special case here than to do it in all code generators)
+					formatter.WriteToken("-");
 				}
 				string number = f.ToString("R", NumberFormatInfo.InvariantInfo);
 				if (number.IndexOf('.') < 0 && number.IndexOf('E') < 0) {
@@ -2166,6 +2186,7 @@ namespace ICSharpCode.NRefactory.CSharp
 			WriteAttributes(indexerDeclaration.Attributes);
 			WriteModifiers(indexerDeclaration.ModifierTokens);
 			indexerDeclaration.ReturnType.AcceptVisitor(this);
+			Space();
 			WritePrivateImplementationType(indexerDeclaration.PrivateImplementationType);
 			WriteKeyword(IndexerDeclaration.ThisKeywordRole);
 			Space(policy.SpaceBeforeMethodDeclarationParentheses);
@@ -2298,10 +2319,10 @@ namespace ICSharpCode.NRefactory.CSharp
 			EndNode(variableInitializer);
 		}
 		
-		public void VisitCompilationUnit(CompilationUnit compilationUnit)
+		public void VisitSyntaxTree(SyntaxTree syntaxTree)
 		{
 			// don't do node tracking as we visit all children directly
-			foreach (AstNode node in compilationUnit.Children) {
+			foreach (AstNode node in syntaxTree.Children) {
 				node.AcceptVisitor(this);
 			}
 		}

@@ -212,10 +212,10 @@ namespace ICSharpCode.ILSpy
 		{
 			astBuilder.RunTransformations(transformAbortCondition);
 			if (additionalTransform != null) {
-				additionalTransform.Run(astBuilder.CompilationUnit);
+				additionalTransform.Run(astBuilder.SyntaxTree);
 			}
 			if (options.DecompilerSettings.ShowXmlDocumentation) {
-				AddXmlDocTransform.Run(astBuilder.CompilationUnit);
+				AddXmlDocTransform.Run(astBuilder.SyntaxTree);
 			}
 			astBuilder.GenerateCode(output);
 		}
@@ -262,13 +262,13 @@ namespace ICSharpCode.ILSpy
 		{
 			if (options.FullDecompilation && options.SaveAsProjectDirectory != null) {
 				HashSet<string> directories = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
-				var files = WriteCodeFilesInProject(assembly.AssemblyDefinition, options, directories).ToList();
+				var files = WriteCodeFilesInProject(assembly.ModuleDefinition, options, directories).ToList();
 				files.AddRange(WriteResourceFilesInProject(assembly, options, directories));
-				WriteProjectFile(new TextOutputWriter(output), files, assembly.AssemblyDefinition.MainModule);
+				WriteProjectFile(new TextOutputWriter(output), files, assembly.ModuleDefinition);
 			} else {
 				base.DecompileAssembly(assembly, output, options);
 				output.WriteLine();
-				ModuleDefinition mainModule = assembly.AssemblyDefinition.MainModule;
+				ModuleDefinition mainModule = assembly.ModuleDefinition;
 				if (mainModule.EntryPoint != null) {
 					output.Write("// Entry point: ");
 					output.WriteReference(mainModule.EntryPoint.DeclaringType.FullName + "." + mainModule.EntryPoint.Name, mainModule.EntryPoint);
@@ -296,8 +296,8 @@ namespace ICSharpCode.ILSpy
 				
 				// don't automatically load additional assemblies when an assembly node is selected in the tree view
 				using (options.FullDecompilation ? null : LoadedAssembly.DisableAssemblyLoad()) {
-					AstBuilder codeDomBuilder = CreateAstBuilder(options, currentModule: assembly.AssemblyDefinition.MainModule);
-					codeDomBuilder.AddAssembly(assembly.AssemblyDefinition, onlyAssemblyLevel: !options.FullDecompilation);
+					AstBuilder codeDomBuilder = CreateAstBuilder(options, currentModule: assembly.ModuleDefinition);
+					codeDomBuilder.AddAssembly(assembly.ModuleDefinition, onlyAssemblyLevel: !options.FullDecompilation);
 					codeDomBuilder.RunTransformations(transformAbortCondition);
 					codeDomBuilder.GenerateCode(output);
 				}
@@ -317,7 +317,7 @@ namespace ICSharpCode.ILSpy
 				w.WriteAttributeString("DefaultTargets", "Build");
 
 				w.WriteStartElement("PropertyGroup");
-				w.WriteElementString("ProjectGuid", Guid.NewGuid().ToString().ToUpperInvariant());
+				w.WriteElementString("ProjectGuid", Guid.NewGuid().ToString("B").ToUpperInvariant());
 
 				w.WriteStartElement("Configuration");
 				w.WriteAttributeString("Condition", " '$(Configuration)' == '' ");
@@ -423,9 +423,28 @@ namespace ICSharpCode.ILSpy
 			return true;
 		}
 
-		IEnumerable<Tuple<string, string>> WriteCodeFilesInProject(AssemblyDefinition assembly, DecompilationOptions options, HashSet<string> directories)
+		IEnumerable<Tuple<string, string>> WriteAssemblyInfo(ModuleDefinition module, DecompilationOptions options, HashSet<string> directories)
 		{
-			var files = assembly.MainModule.Types.Where(t => IncludeTypeWhenDecompilingProject(t, options)).GroupBy(
+			// don't automatically load additional assemblies when an assembly node is selected in the tree view
+			using (LoadedAssembly.DisableAssemblyLoad())
+			{
+				AstBuilder codeDomBuilder = CreateAstBuilder(options, currentModule: module);
+				codeDomBuilder.AddAssembly(module, onlyAssemblyLevel: true);
+				codeDomBuilder.RunTransformations(transformAbortCondition);
+
+				string prop = "Properties";
+				if (directories.Add("Properties"))
+					Directory.CreateDirectory(Path.Combine(options.SaveAsProjectDirectory, prop));
+				string assemblyInfo = Path.Combine(prop, "AssemblyInfo" + this.FileExtension);
+				using (StreamWriter w = new StreamWriter(Path.Combine(options.SaveAsProjectDirectory, assemblyInfo)))
+					codeDomBuilder.GenerateCode(new PlainTextOutput(w));
+				return new Tuple<string, string>[] { Tuple.Create("Compile", assemblyInfo) };
+			}
+		}
+
+		IEnumerable<Tuple<string, string>> WriteCodeFilesInProject(ModuleDefinition module, DecompilationOptions options, HashSet<string> directories)
+		{
+			var files = module.Types.Where(t => IncludeTypeWhenDecompilingProject(t, options)).GroupBy(
 				delegate(TypeDefinition type) {
 					string file = TextView.DecompilerTextView.CleanUpName(type.Name) + this.FileExtension;
 					if (string.IsNullOrEmpty(type.Namespace)) {
@@ -443,7 +462,7 @@ namespace ICSharpCode.ILSpy
 				new ParallelOptions { MaxDegreeOfParallelism = Environment.ProcessorCount },
 				delegate(IGrouping<string, TypeDefinition> file) {
 					using (StreamWriter w = new StreamWriter(Path.Combine(options.SaveAsProjectDirectory, file.Key))) {
-						AstBuilder codeDomBuilder = CreateAstBuilder(options, currentModule: assembly.MainModule);
+						AstBuilder codeDomBuilder = CreateAstBuilder(options, currentModule: module);
 						foreach (TypeDefinition type in file) {
 							codeDomBuilder.AddType(type);
 						}
@@ -452,7 +471,7 @@ namespace ICSharpCode.ILSpy
 					}
 				});
 			AstMethodBodyBuilder.PrintNumberOfUnhandledOpcodes();
-			return files.Select(f => Tuple.Create("Compile", f.Key));
+			return files.Select(f => Tuple.Create("Compile", f.Key)).Concat(WriteAssemblyInfo(module, options, directories));
 		}
 		#endregion
 
@@ -461,7 +480,7 @@ namespace ICSharpCode.ILSpy
 		{
 			//AppDomain bamlDecompilerAppDomain = null;
 			//try {
-				foreach (EmbeddedResource r in assembly.AssemblyDefinition.MainModule.Resources.OfType<EmbeddedResource>()) {
+				foreach (EmbeddedResource r in assembly.ModuleDefinition.Resources.OfType<EmbeddedResource>()) {
 					string fileName;
 					Stream s = r.GetResourceStream();
 					s.Position = 0;
@@ -482,8 +501,8 @@ namespace ICSharpCode.ILSpy
 								Stream entryStream = (Stream)pair.Value;
 								entryStream.Position = 0;
 								if (fileName.EndsWith(".baml", StringComparison.OrdinalIgnoreCase)) {
-									MemoryStream ms = new MemoryStream();
-									entryStream.CopyTo(ms);
+//									MemoryStream ms = new MemoryStream();
+//									entryStream.CopyTo(ms);
 									// TODO implement extension point
 //									var decompiler = Baml.BamlResourceEntryNode.CreateBamlDecompilerInAppDomain(ref bamlDecompilerAppDomain, assembly.FileName);
 //									string xaml = null;
@@ -650,7 +669,7 @@ namespace ICSharpCode.ILSpy
 				else
 					b.AddField(fd);
 				b.RunTransformations();
-				foreach (var attribute in b.CompilationUnit.Descendants.OfType<AttributeSection>())
+				foreach (var attribute in b.SyntaxTree.Descendants.OfType<AttributeSection>())
 					attribute.Remove();
 
 				StringWriter w = new StringWriter();

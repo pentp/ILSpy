@@ -32,7 +32,6 @@ using System.Windows.Interop;
 using System.Windows.Media;
 using System.Windows.Media.Imaging;
 using ICSharpCode.Decompiler;
-using ICSharpCode.ILSpy.Debugger;
 using ICSharpCode.ILSpy.TextView;
 using ICSharpCode.ILSpy.TreeNodes;
 using ICSharpCode.ILSpy.XmlDoc;
@@ -50,7 +49,7 @@ namespace ICSharpCode.ILSpy
 		readonly NavigationHistory<NavigationState> history = new NavigationHistory<NavigationState>();
 		ILSpySettings spySettings;
 		internal SessionSettings sessionSettings;
-
+		
 		internal AssemblyListManager assemblyListManager;
 		AssemblyList assemblyList;
 		AssemblyListTreeNode assemblyListTreeNode;
@@ -281,9 +280,9 @@ namespace ICSharpCode.ILSpy
 					}
 				} else {
 					foreach (LoadedAssembly asm in commandLineLoadedAssemblies) {
-						AssemblyDefinition def = asm.AssemblyDefinition;
+						ModuleDefinition def = asm.ModuleDefinition;
 						if (def != null) {
-							MemberReference mr = XmlDocKeyProvider.FindMemberByKey(def.MainModule, args.NavigateTo);
+							MemberReference mr = XmlDocKeyProvider.FindMemberByKey(def, args.NavigateTo);
 							if (mr != null) {
 								found = true;
 								JumpToReference(mr);
@@ -300,7 +299,7 @@ namespace ICSharpCode.ILSpy
 			} else if (commandLineLoadedAssemblies.Count == 1) {
 				// NavigateTo == null and an assembly was given on the command-line:
 				// Select the newly loaded assembly
-				JumpToReference(commandLineLoadedAssemblies[0].AssemblyDefinition);
+				JumpToReference(commandLineLoadedAssemblies[0].ModuleDefinition);
 			}
 			commandLineLoadedAssemblies.Clear(); // clear references once we don't need them anymore
 		}
@@ -317,7 +316,7 @@ namespace ICSharpCode.ILSpy
 			HandleCommandLineArguments(App.CommandLineArguments);
 			
 			if (assemblyList.GetAssemblies().Length == 0
-			    && assemblyList.ListName == AssemblyListManager.DefaultListName)
+				&& assemblyList.ListName == AssemblyListManager.DefaultListName)
 			{
 				LoadInitialAssemblies();
 			}
@@ -409,7 +408,7 @@ namespace ICSharpCode.ILSpy
 				ShowAssemblyList(list);
 			}
 		}
-
+		
 		void ShowAssemblyList(AssemblyList assemblyList)
 		{
 			history.Clear();
@@ -427,7 +426,7 @@ namespace ICSharpCode.ILSpy
 			else
 				this.Title = "ILSpy - " + assemblyList.ListName;
 		}
-
+		
 		void assemblyList_Assemblies_CollectionChanged(object sender, NotifyCollectionChangedEventArgs e)
 		{
 			if (e.Action == NotifyCollectionChangedAction.Reset) {
@@ -465,7 +464,7 @@ namespace ICSharpCode.ILSpy
 			foreach (System.Reflection.Assembly asm in initialAssemblies)
 				assemblyList.OpenAssembly(asm.Location);
 		}
-
+		
 		void filterSettings_PropertyChanged(object sender, PropertyChangedEventArgs e)
 		{
 			RefreshTreeViewFilter();
@@ -497,9 +496,9 @@ namespace ICSharpCode.ILSpy
 					treeView.SelectedItem = obj;
 				} else {
 					MessageBox.Show("Navigation failed because the target is hidden or a compiler-generated class.\n" +
-					                "Please disable all filters that might hide the item (i.e. activate " +
-					                "\"View > Show internal types and members\") and try again.",
-					                "ILSpy", MessageBoxButton.OK, MessageBoxImage.Exclamation);
+						"Please disable all filters that might hide the item (i.e. activate " +
+						"\"View > Show internal types and members\") and try again.",
+						"ILSpy", MessageBoxButton.OK, MessageBoxImage.Exclamation);
 				}
 			}
 		}
@@ -556,6 +555,8 @@ namespace ICSharpCode.ILSpy
 				return assemblyListTreeNode.FindEventNode(((EventReference)reference).Resolve());
 			} else if (reference is AssemblyDefinition) {
 				return assemblyListTreeNode.FindAssemblyNode((AssemblyDefinition)reference);
+			} else if (reference is ModuleDefinition) {
+				return assemblyListTreeNode.FindAssemblyNode((ModuleDefinition)reference);
 			} else {
 				return null;
 			}
@@ -615,13 +616,9 @@ namespace ICSharpCode.ILSpy
 		
 		void RefreshCommandExecuted(object sender, ExecutedRoutedEventArgs e)
 		{
-			if (!DebugInformation.IsDebuggerLoaded) {
-				var path = GetPathForNode(treeView.SelectedItem as SharpTreeNode);
-				ShowAssemblyList(assemblyListManager.LoadList(ILSpySettings.Load(), assemblyList.ListName));
-				SelectNode(FindNodeByPath(path, true));
-			} else {
-				e.Handled = false;
-			}
+			var path = GetPathForNode(treeView.SelectedItem as SharpTreeNode);
+			ShowAssemblyList(assemblyListManager.LoadList(ILSpySettings.Load(), assemblyList.ListName));
+			SelectNode(FindNodeByPath(path, true));
 		}
 		
 		void SearchCommandExecuted(object sender, ExecutedRoutedEventArgs e)
@@ -635,21 +632,21 @@ namespace ICSharpCode.ILSpy
 		{
 			DecompileSelectedNodes();
 		}
-
-		private bool ignoreDecompilationRequests;
-
-		private void DecompileSelectedNodes(DecompilerTextViewState state = null, bool recordHistory = true)
+		
+		bool ignoreDecompilationRequests;
+		
+		void DecompileSelectedNodes(DecompilerTextViewState state = null, bool recordHistory = true)
 		{
 			if (ignoreDecompilationRequests)
 				return;
-
+			
 			if (recordHistory) {
 				var dtState = decompilerTextView.GetState();
 				if(dtState != null)
 					history.UpdateCurrent(new NavigationState(dtState));
 				history.Record(new NavigationState(treeView.SelectedItems.OfType<SharpTreeNode>()));
 			}
-
+			
 			if (treeView.SelectedItems.Count == 1) {
 				ILSpyTreeNode node = treeView.SelectedItem as ILSpyTreeNode;
 				if (node != null && node.View(decompilerTextView))
@@ -665,8 +662,8 @@ namespace ICSharpCode.ILSpy
 					return;
 			}
 			this.TextView.SaveToDisk(this.CurrentLanguage,
-			                         this.SelectedNodes,
-			                         new DecompilationOptions() { FullDecompilation = true });
+				this.SelectedNodes,
+				new DecompilationOptions() { FullDecompilation = true });
 		}
 		
 		public void RefreshDecompiledView()
@@ -719,14 +716,14 @@ namespace ICSharpCode.ILSpy
 				NavigateHistory(true);
 			}
 		}
-
+		
 		void NavigateHistory(bool forward)
 		{
 			var dtState = decompilerTextView.GetState();
 			if(dtState != null)
 				history.UpdateCurrent(new NavigationState(dtState));
 			var newState = forward ? history.GoForward() : history.GoBack();
-
+			
 			ignoreDecompilationRequests = true;
 			treeView.SelectedItems.Clear();
 			foreach (var node in newState.TreeNodes)
@@ -738,7 +735,7 @@ namespace ICSharpCode.ILSpy
 			ignoreDecompilationRequests = false;
 			DecompileSelectedNodes(newState.ViewState, false);
 		}
-
+		
 		#endregion
 		
 		protected override void OnStateChanged(EventArgs e)
@@ -814,7 +811,7 @@ namespace ICSharpCode.ILSpy
 				pane.Closed();
 		}
 		#endregion
-
+		
 		public void UnselectAll()
 		{
 			treeView.UnselectAll();
